@@ -147,8 +147,8 @@ class StocktakeCreator {
             assetGroupName: item.assetgroup_name || 'Unknown',
             isSerialised: false, // Will be determined based on actual assets found
             supplierPartCode: item.supplier_part_code || '',
-            cost: item.price_cost || 0,
-            price: item.price_retail || 0,
+            cost: item.costprice || 0,
+            price: item.baseprice || 0,
             stockLocations: []
           };
 
@@ -196,14 +196,26 @@ class StocktakeCreator {
                     );
 
                     if (assetsWithSerials.length > 0) {
-                      locationData.serialNumbers = assetsWithSerials.map(asset => ({
-                        id: asset.id,
-                        serialNumber: asset.inventory_number || asset.serial_number || `Unknown-${asset.id}`,
-                        status: asset.status_id === 0 ? 'in_stock' : 'deployed',
-                        userName: asset.username || 'Unassigned',
-                        cost: asset.cost || asset.cost_price || asset.purchase_cost || asset.price_cost || 0
-                      }));
-                      console.log(`Processed ${locationData.serialNumbers.length} serial numbers:`, locationData.serialNumbers);
+                      // Fetch per-asset cost from individual asset details (stockdetails.cost)
+                      const serialNumbers = [];
+                      for (const asset of assetsWithSerials) {
+                        let assetCost = 0;
+                        try {
+                          const detail = await haloAPI.getAssetDetails(asset.id);
+                          assetCost = detail.stockdetails?.cost || 0;
+                        } catch (e) {
+                          console.warn(`Could not fetch asset details for ${asset.id}: ${e.message}`);
+                        }
+                        serialNumbers.push({
+                          id: asset.id,
+                          serialNumber: asset.inventory_number || asset.serial_number || `Unknown-${asset.id}`,
+                          status: asset.status_id === 0 ? 'in_stock' : 'deployed',
+                          userName: asset.username || 'Unassigned',
+                          cost: assetCost
+                        });
+                      }
+                      locationData.serialNumbers = serialNumbers;
+                      console.log(`Processed ${locationData.serialNumbers.length} serial numbers with costs`);
 
                       // Mark item as serialised only if we found actual serial numbers
                       processedItem.isSerialised = true;
