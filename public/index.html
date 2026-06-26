@@ -1,0 +1,2505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Halo Stocktake System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .header p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button.secondary {
+            background: #48bb78;
+        }
+
+        .button.secondary:hover {
+            background: #38a169;
+        }
+
+        .button.danger {
+            background: #f56565;
+        }
+
+        .button.danger:hover {
+            background: #e53e3e;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .input-group input,
+        .input-group select,
+        .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus,
+        .input-group select:focus,
+        .input-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .stocktake-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stocktake-item {
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .stocktake-item:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .stocktake-item h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .stocktake-item p {
+            color: #666;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        .status.in_progress {
+            background: #fef5e7;
+            color: #f39c12;
+        }
+
+        .status.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-box h3 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .stat-box p {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .item-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .item-row {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 15px 0;
+        }
+
+        .item-row:last-child {
+            border-bottom: none;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .item-title {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .item-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            padding: 10px 0;
+            font-size: 0.9em;
+        }
+
+        .serial-list {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px;
+        }
+
+        .serial-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .serial-item:last-child {
+            border-bottom: none;
+        }
+
+        .serial-checkbox {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        .serial-number {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .badge.serialised {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .badge.non_serialised {
+            background: #f3e5f5;
+            color: #6a1b9a;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 20px;
+            background: #f7fafc;
+            padding: 10px 10px 0 10px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+            background: #e2e8f0;
+            border-radius: 8px 8px 0 0;
+            border: 1px solid #cbd5e0;
+            margin-right: 5px;
+        }
+
+        .tab:hover {
+            color: #333;
+            background: #e2e8f0;
+        }
+
+        .tab.active {
+            background: white;
+            border-bottom: 2px solid white;
+            margin-bottom: -2px;
+            z-index: 1;
+            color: #667eea;
+            border-color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .variance-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .variance-item {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid;
+        }
+
+        .variance-item.positive {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .variance-item.negative {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .variance-item.neutral {
+            background: #fff3cd;
+            border-color: #ffc107;
+        }
+
+        .variance-value {
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+
+        .variance-value.positive {
+            color: #28a745;
+        }
+
+        .variance-value.negative {
+            color: #dc3545;
+        }
+
+        /* Scanned Item Styles */
+        .scanned-item-row {
+            transition: all 0.2s ease;
+        }
+
+        .scanned-item-row:hover {
+            background: #f7fafc !important;
+        }
+
+        .scanned-item-row:active {
+            background: #edf2f7 !important;
+        }
+
+        /* Barcode Input Styles */
+        #barcodeInput:focus {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Activity Feed Styles */
+        #recentActivity {
+            transition: all 0.3s ease;
+        }
+
+        /* Compact List Styles */
+        #scannedItemsList {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e0 #f7fafc;
+        }
+
+        #scannedItemsList::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #scannedItemsList::-webkit-scrollbar-track {
+            background: #f7fafc;
+        }
+
+        #scannedItemsList::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 4px;
+        }
+
+        #scannedItemsList::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+        }
+
+        /* Collapsible Inventory Summary Styles */
+        .inventory-summary {
+            margin-top: 20px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .inventory-summary-header {
+            padding: 15px;
+            background: #f7fafc;
+            border-radius: 8px 8px 0 0;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .inventory-summary-header:hover {
+            background: #edf2f7;
+        }
+
+        .inventory-summary-content {
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .inventory-summary-content.expanded {
+            display: block;
+        }
+
+        .inventory-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        .inventory-table th {
+            background: #f7fafc;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+        }
+
+        .inventory-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .inventory-table tr:hover {
+            background: #f7fafc;
+        }
+
+        .inventory-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .serial-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .serial-badge.yes {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .serial-badge.no {
+            background: #f3e5f5;
+            color: #6a1b9a;
+        }
+
+        /* Dropdown Styles */
+        .item-dropdown {
+            position: relative;
+        }
+
+        .dropdown-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 0 0 8px 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+            display: none;
+        }
+
+        .dropdown-suggestions.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #e2e8f0;
+            transition: background 0.2s ease;
+        }
+
+        .dropdown-item:hover {
+            background: #f7fafc;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .dropdown-item-details {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .dropdown-item-sku {
+            font-family: monospace;
+            background: #e3f2fd;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8em;
+        }
+
+        .quantity-input-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .quantity-input-modal.show {
+            display: flex !important;
+        }
+
+        .quantity-input-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .quantity-input-content h3 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .quantity-input-content .input-group {
+            margin-bottom: 20px;
+        }
+
+        /* Serial Selection Styles */
+        .serial-selection-item {
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        .serial-selection-item:hover {
+            background: #f7fafc;
+            border-color: #667eea;
+        }
+
+        .serial-selection-item.selected {
+            background: #e3f2fd;
+            border-color: #667eea;
+        }
+
+        .serial-selection-item.found {
+            opacity: 0.6;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .serial-checkbox {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            position: relative;
+            z-index: 10;
+        }
+
+        .serial-checkbox:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .serial-checkbox:not(:disabled) {
+            cursor: pointer;
+        }
+
+        .serial-checkbox:not(:disabled):hover {
+            transform: scale(1.1);
+        }
+
+        .serial-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .serial-number {
+            font-family: monospace;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .serial-status {
+            font-size: 0.85em;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .serial-status.found {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .serial-status.missing {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🔧 Halo Stocktake System</h1>
+            <p>Complete inventory management and stocktake solution for Halo PSA</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs">
+            <div class="tab active" data-tab="dashboard">Dashboard</div>
+            <div class="tab" data-tab="create">New Stocktake</div>
+            <div class="tab" data-tab="active">Active Stocktake</div>
+            <div class="tab" data-tab="reports">Reports</div>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="card">
+                <h2>📊 Dashboard</h2>
+                <div id="dashboardContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading dashboard...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Stocktake Tab -->
+        <div id="create" class="tab-content">
+            <div class="card">
+                <h2>🆕 Create New Stocktake</h2>
+                <div id="createStocktakeForm">
+                    <div class="input-group">
+                        <label for="stocktakeName">Stocktake Name</label>
+                        <input type="text" id="stocktakeName" placeholder="e.g., Monthly Stocktake June 2026">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="stocktakeNotes">Notes (optional)</label>
+                        <textarea id="stocktakeNotes" rows="3" placeholder="Additional notes about this stocktake..."></textarea>
+                    </div>
+
+                    <button class="button" onclick="createStocktake()">Create Stocktake</button>
+                </div>
+
+                <div id="createProgress" class="hidden">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p id="createProgressText">Creating stocktake...</p>
+
+                        <div id="createProgressIndicator" style="margin-top: 20px;">
+                            <div style="background: #e2e8f0; border-radius: 10px; height: 20px; overflow: hidden; margin-bottom: 10px;">
+                                <div id="createProgressBar" style="background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); height: 100%; width: 0%; transition: width 0.5s ease;"></div>
+                            </div>
+                            <div style="text-align: center; font-size: 0.9em; color: #666;">
+                                <span id="createProgressPercent">0%</span> complete
+                            </div>
+                            <div style="text-align: center; font-size: 0.8em; color: #999; margin-top: 10px;">
+                                ⏱️ This typically takes 1-2 minutes • Please wait
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Stocktake Tab -->
+        <div id="active" class="tab-content">
+            <div class="card">
+                <h2>📋 Active Stocktake</h2>
+                <div id="activeStocktakeContent">
+                    <p style="color: #666; text-align: center; padding: 20px;">
+                        No active stocktake. Create a new stocktake to get started.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="reports" class="tab-content">
+            <div class="card">
+                <h2>📈 Stocktake Reports</h2>
+                <div id="reportsContent">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading reports...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quantity Input Modal -->
+    <div id="quantityInputModal" class="quantity-input-modal">
+        <div class="quantity-input-content">
+            <h3 id="modalItemName">Item Name</h3>
+            <div class="input-group">
+                <label for="modalQuantity">Quantity to Add:</label>
+                <input type="number" id="modalQuantity" min="1" value="1" placeholder="Enter quantity">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="button" style="background: #ccc;" onclick="closeQuantityModal()">Cancel</button>
+                <button class="button" onclick="confirmQuantityModal()">Add Quantity</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Serial Selection Modal -->
+    <div id="serialSelectionModal" class="quantity-input-modal">
+        <div class="quantity-input-content" style="max-width: 600px;">
+            <h3 id="serialModalItemName">Select Serial Numbers to Count</h3>
+            <div style="margin-bottom: 15px; padding: 10px; background: #f7fafc; border-radius: 6px; font-size: 0.9em;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span>Expected: <strong id="expectedCount">0</strong></span>
+                        <span style="margin: 0 10px;">•</span>
+                        <span>Found: <strong id="foundCount">0</strong></span>
+                        <span style="margin: 0 10px;">•</span>
+                        <span>Total Counted: <strong id="totalCounted">0</strong></span>
+                    </div>
+                </div>
+            </div>
+            <div style="max-height: 400px; overflow-y: auto; margin-bottom: 20px;">
+                <div id="serialSelectionList"></div>
+            </div>
+            <div id="overstockOption" style="display: none; margin-bottom: 20px; padding: 15px; background: #fff3cd; border-radius: 8px; border: 1px solid #ffc107;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: #856404;">⚠️ Overstock Detected</div>
+                        <div style="font-size: 0.9em; color: #856404; margin-top: 5px;">All expected serials are already counted. You can increment the total count by 1.</div>
+                    </div>
+                    <button class="button" style="background: #ffc107; color: #333;" onclick="incrementOverstockCount()">+1 Count</button>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 0.9em; color: #666;">
+                    <span id="selectedCount">0</span> serials selected
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="button" style="background: #ccc;" onclick="closeSerialModal()">Cancel</button>
+                    <button class="button" onclick="confirmSerialModal()">Count Selected</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab navigation
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const targetTab = this.getAttribute('data-tab');
+
+                // Update tab styles
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+
+                // Show corresponding content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(targetTab).classList.add('active');
+
+                // Load content for the tab
+                loadTabContent(targetTab);
+            });
+        });
+
+        // Load content based on active tab
+        function loadTabContent(tab) {
+            switch(tab) {
+                case 'dashboard':
+                    loadDashboard();
+                    break;
+                case 'reports':
+                    loadReports();
+                    break;
+                case 'active':
+                    loadActiveStocktake();
+                    break;
+            }
+        }
+
+        // API call helper
+        async function apiCall(endpoint, options = {}) {
+            try {
+                const response = await fetch(endpoint, {
+                    method: options.method || 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    body: options.body ? JSON.stringify(options.body) : undefined
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API call failed: ${response.statusText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        // Load dashboard content
+        async function loadDashboard() {
+            try {
+                const stocktakes = await apiCall('/api/stocktakes');
+
+                // Handle case where API returns full stocktake objects vs index data
+                const stocktakeList = Array.isArray(stocktakes) ? stocktakes : [];
+
+                if (stocktakeList.length === 0) {
+                    document.getElementById('dashboardContent').innerHTML = `
+                        <p style="color: #666; text-align: center; padding: 20px;">
+                            No stocktakes found. Create your first stocktake to get started.
+                        </p>
+                    `;
+                    return;
+                }
+
+                // Filter to get only index data if full objects are returned
+                const stocktakesIndex = stocktakeList.map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    createdAt: s.createdAt,
+                    status: s.status,
+                    summary: s.summary
+                }));
+
+                const inProgress = stocktakesIndex.filter(s => s.status === 'in_progress');
+                const completed = stocktakesIndex.filter(s => s.status === 'completed');
+
+                let html = `
+                    <div class="summary-stats">
+                        <div class="stat-box">
+                            <h3>${stocktakesIndex.length}</h3>
+                            <p>Total Stocktakes</p>
+                        </div>
+                        <div class="stat-box">
+                            <h3>${inProgress.length}</h3>
+                            <p>In Progress</p>
+                        </div>
+                        <div class="stat-box">
+                            <h3>${completed.length}</h3>
+                            <p>Completed</p>
+                        </div>
+                    </div>
+                `;
+
+                if (inProgress.length > 0) {
+                    html += `<h3 style="margin-top: 30px; margin-bottom: 15px;">🔄 In Progress</h3>`;
+                    html += renderStocktakeList(inProgress);
+                }
+
+                if (completed.length > 0) {
+                    html += `<h3 style="margin-top: 30px; margin-bottom: 15px;">✅ Completed</h3>`;
+                    html += renderStocktakeList(completed);
+                }
+
+                document.getElementById('dashboardContent').innerHTML = html;
+            } catch (error) {
+                document.getElementById('dashboardContent').innerHTML = `
+                    <div class="alert error">
+                        Failed to load dashboard: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Render stocktake list
+        function renderStocktakeList(stocktakes) {
+            return `<div class="stocktake-list">
+                ${stocktakes.map(stocktake => `
+                    <div class="stocktake-item">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <h3>${stocktake.name}</h3>
+                                <p>📅 Created: ${new Date(stocktake.createdAt).toLocaleString()}</p>
+                                <p>📦 Items: ${stocktake.summary?.totalItems || 0}</p>
+                                <p>📍 Locations: ${stocktake.summary?.totalLocations || 0}</p>
+                                <span class="status ${stocktake.status}">${stocktake.status}</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                ${stocktake.status === 'in_progress' ? `
+                                    <button class="button" style="padding: 8px 16px; width: auto;" onclick="resumeStocktake('${stocktake.id}')">
+                                        Resume
+                                    </button>
+                                ` : ''}
+                                <button class="button danger" style="padding: 8px 16px; width: auto;" onclick="deleteStocktake('${stocktake.id}', '${stocktake.name.replace(/'/g, "\\'")}')">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>`;
+        }
+
+        // Resume existing stocktake
+        async function resumeStocktake(stocktakeId) {
+            try {
+                // Set the active stocktake in localStorage
+                localStorage.setItem('activeStocktakeId', stocktakeId);
+
+                // Switch to active stocktake tab
+                document.querySelector('[data-tab="active"]').click();
+
+                // Load the stocktake interface
+                loadActiveStocktake();
+            } catch (error) {
+                console.error('Failed to resume stocktake:', error);
+                alert('Failed to resume stocktake: ' + error.message);
+            }
+        }
+
+        // Delete stocktake
+        async function deleteStocktake(stocktakeId, stocktakeName) {
+            try {
+                // Confirm deletion
+                const confirmed = confirm(`Are you sure you want to delete "${stocktakeName}"? This action cannot be undone.`);
+
+                if (!confirmed) return;
+
+                // Check if this is the active stocktake
+                const activeStocktakeId = localStorage.getItem('activeStocktakeId');
+                if (activeStocktakeId === stocktakeId) {
+                    localStorage.removeItem('activeStocktakeId');
+                }
+
+                await apiCall(`/api/stocktake/${stocktakeId}`, {
+                    method: 'DELETE'
+                });
+
+                // Refresh the dashboard
+                loadDashboard();
+
+                // Show success message
+                showActivity(`✅ Deleted stocktake: ${stocktakeName}`);
+            } catch (error) {
+                console.error('Failed to delete stocktake:', error);
+                alert('Failed to delete stocktake: ' + error.message);
+            }
+        }
+
+        // Create new stocktake
+        // Create new stocktake with real progress
+        async function createStocktake() {
+            const name = document.getElementById('stocktakeName').value.trim();
+            const notes = document.getElementById('stocktakeNotes').value.trim();
+
+            if (!name) {
+                alert('Please enter a stocktake name');
+                return;
+            }
+
+            // Show progress
+            document.getElementById('createStocktakeForm').classList.add('hidden');
+            document.getElementById('createProgress').classList.remove('hidden');
+            document.getElementById('createProgressText').textContent = 'Starting creation process...';
+            document.getElementById('createProgressIndicator').classList.remove('hidden');
+
+            try {
+                // Start the creation process
+                const startResult = await apiCall('/api/start-stocktake-creation', {
+                    method: 'POST',
+                    body: { name, notes }
+                });
+
+                const creationId = startResult.creationId;
+
+                // Poll for progress updates
+                pollStocktakeProgress(creationId);
+
+            } catch (error) {
+                document.getElementById('createProgressText').textContent = `❌ Error: ${error.message}`;
+                document.getElementById('createProgressIndicator').classList.add('alert', 'error');
+
+                setTimeout(() => {
+                    document.getElementById('createStocktakeForm').classList.remove('hidden');
+                    document.getElementById('createProgress').classList.add('hidden');
+                    document.getElementById('createProgressIndicator').classList.add('hidden');
+                }, 3000);
+            }
+        }
+
+        // Poll for stocktake creation progress
+        async function pollStocktakeProgress(creationId) {
+            const progressBar = document.getElementById('createProgressBar');
+            const progressPercent = document.getElementById('createProgressPercent');
+            const progressText = document.getElementById('createProgressText');
+
+            let attempts = 0;
+            const maxAttempts = 120; // 2 minutes with 1-second intervals
+
+            const pollInterval = setInterval(async () => {
+                attempts++;
+
+                try {
+                    const progress = await apiCall(`/api/stocktake-progress/${creationId}`);
+
+                    // Update progress display
+                    progressText.textContent = progress.step || 'Processing...';
+                    progressBar.style.width = progress.progress + '%';
+                    progressPercent.textContent = Math.round(progress.progress) + '%';
+
+                    // Show current item being processed
+                    if (progress.currentItem) {
+                        progressText.textContent = `${progress.step}: ${progress.currentItem}`;
+                        if (progress.totalItems && progress.processedItems) {
+                            progressText.textContent += ` (${progress.processedItems}/${progress.totalItems})`;
+                        }
+                    }
+
+                    // Check if creation is complete
+                    if (progress.status === 'completed' && progress.stocktakeId) {
+                        clearInterval(pollInterval);
+
+                        // Show success state
+                        progressText.textContent = '✅ Stocktake created successfully!';
+                        progressBar.style.width = '100%';
+                        progressPercent.textContent = '100%';
+
+                        // Add continue button
+                        const continueButton = document.createElement('button');
+                        continueButton.className = 'button';
+                        continueButton.textContent = '📋 Go to Stocktake';
+                        continueButton.onclick = () => {
+                            document.querySelector('[data-tab="active"]').click();
+                            localStorage.setItem('activeStocktakeId', progress.stocktakeId);
+                            loadActiveStocktake();
+                        };
+
+                        const progressContainer = document.getElementById('createProgress');
+                        const existingButton = progressContainer.querySelector('.button');
+                        if (existingButton) {
+                            existingButton.replaceWith(continueButton);
+                        } else {
+                            progressContainer.querySelector('.loading').appendChild(continueButton);
+                        }
+
+                        // Auto-redirect after 2 seconds
+                        setTimeout(() => {
+                            document.querySelector('[data-tab="active"]').click();
+                            localStorage.setItem('activeStocktakeId', progress.stocktakeId);
+                            loadActiveStocktake();
+                        }, 2000);
+
+                    } else if (progress.status === 'error') {
+                        clearInterval(pollInterval);
+
+                        progressText.textContent = `❌ ${progress.error || 'Creation failed'}`;
+                        document.getElementById('createProgressIndicator').classList.add('alert', 'error');
+
+                        setTimeout(() => {
+                            document.getElementById('createStocktakeForm').classList.remove('hidden');
+                            document.getElementById('createProgress').classList.add('hidden');
+                            document.getElementById('createProgressIndicator').classList.add('hidden');
+                        }, 3000);
+
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(pollInterval);
+
+                        progressText.textContent = '⏱️ Taking longer than expected...';
+
+                        // Continue polling in background
+                        setTimeout(() => {
+                            pollStocktakeProgress(creationId);
+                        }, 5000);
+                    }
+
+                } catch (error) {
+                    console.error('Error polling progress:', error);
+                }
+            }, 1000); // Poll every second
+        }
+
+        // Load active stocktake
+        async function loadActiveStocktake() {
+            const stocktakeId = localStorage.getItem('activeStocktakeId');
+
+            if (!stocktakeId) {
+                document.getElementById('activeStocktakeContent').innerHTML = `
+                    <p style="color: #666; text-align: center; padding: 20px;">
+                        No active stocktake. Create a new stocktake to get started.
+                    </p>
+                `;
+                return;
+            }
+
+            try {
+                const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
+                renderStocktakeInterface(stocktake);
+            } catch (error) {
+                document.getElementById('activeStocktakeContent').innerHTML = `
+                    <div class="alert error">
+                        Failed to load stocktake: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Render stocktake counting interface
+        function renderStocktakeInterface(stocktake) {
+            // Build a lookup map for quick barcode scanning
+            const barcodeLookup = buildBarcodeLookup(stocktake);
+
+            let html = `
+                <div class="header" style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div>
+                            <h3 style="margin: 0;">${stocktake.name}</h3>
+                            <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">📅 ${new Date(stocktake.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="button secondary" style="padding: 8px 16px;" onclick="completeStocktake('${stocktake.id}')">
+                                ✅ Complete
+                            </button>
+                            <button class="button danger" style="padding: 8px 16px;" onclick="cancelStocktake('${stocktake.id}')">
+                                ❌ Cancel
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Barcode Scanner Input -->
+                    <div style="background: white; padding: 20px; border-radius: 8px; border: 2px solid #667eea;">
+                        <div class="item-dropdown">
+                            <div style="display: flex; gap: 15px; align-items: center;">
+                                <div style="flex: 1;">
+                                    <input type="text"
+                                        id="barcodeInput"
+                                        placeholder="🔍 Scan PLU, Serial, or type item name..."
+                                        style="width: 100%; padding: 15px; font-size: 18px; border: 2px solid #e2e8f0; border-radius: 8px;"
+                                        autofocus
+                                        onkeypress="handleBarcodeScan(event, '${stocktake.id}')"
+                                        oninput="handleItemSearch(this.value, '${stocktake.id}')">
+                                </div>
+                                <button class="button" style="padding: 15px 30px; font-size: 16px;" onclick="processBarcode('${stocktake.id}')">
+                                    📷 Scan
+                                </button>
+                            </div>
+                            <div id="dropdownSuggestions" class="dropdown-suggestions"></div>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 0.85em; color: #666;">
+                            💡 Scan barcodes for auto-increment OR type item names to manually add quantities
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5em; font-weight: 600;">${stocktake.summary?.totalItems || 0}</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">Total Items</div>
+                    </div>
+                    <div style="flex: 1; background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5em; font-weight: 600;">${countScannedItems(stocktake)}</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">Items Scanned</div>
+                    </div>
+                    <div style="flex: 1; background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5em; font-weight: 600;">${countTotalScans(stocktake)}</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">Total Scans</div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div id="recentActivity" style="margin-bottom: 15px; padding: 15px; background: #f7fafc; border-radius: 8px; min-height: 60px;">
+                    <div style="font-size: 0.9em; color: #666; text-align: center; padding: 10px;">
+                        📷 Ready to scan items...
+                    </div>
+                </div>
+
+                <!-- Scanned Items List -->
+                <div style="background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; font-weight: 600; background: #f7fafc; border-radius: 8px 8px 0 0;">
+                        📋 Scanned Items (${countScannedItems(stocktake)} of ${stocktake.summary?.totalItems || 0})
+                    </div>
+                    <div id="scannedItemsList" style="max-height: 400px; overflow-y: auto;">
+                        ${renderScannedItemsList(stocktake, barcodeLookup)}
+                    </div>
+                </div>
+
+                <!-- Complete Inventory Summary (Collapsible) -->
+                <div class="inventory-summary">
+                    <div class="inventory-summary-header" onclick="toggleInventorySummary()">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.2em;">📦</span>
+                            <div>
+                                <div style="font-weight: 600;">Complete Inventory Summary</div>
+                                <div style="font-size: 0.85em; color: #666;">All ${stocktake.summary?.totalItems || 0} imported items • ${stocktake.summary?.totalSerialised || 0} serialised, ${stocktake.summary?.totalNonSerialised || 0} non-serialised</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 0.85em; color: #666;">Click to expand</span>
+                            <div id="inventoryToggleIcon" style="transition: transform 0.3s ease;">▼</div>
+                        </div>
+                    </div>
+                    <div id="inventorySummaryContent" class="inventory-summary-content">
+                        ${renderInventorySummaryTable(stocktake)}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('activeStocktakeContent').innerHTML = html;
+
+            // Auto-focus the barcode input
+            setTimeout(() => {
+                const barcodeInput = document.getElementById('barcodeInput');
+                if (barcodeInput) barcodeInput.focus();
+            }, 100);
+        }
+
+        // Build barcode lookup map for quick scanning
+        function buildBarcodeLookup(stocktake) {
+            const lookup = {};
+            let serialCount = 0;
+            let upcCount = 0;
+            let itemCount = 0;
+
+            stocktake.haloData?.items?.forEach(item => {
+                itemCount++;
+                item.stockLocations?.forEach(location => {
+                    const key = `${item.id}-${location.id}`;
+
+                    lookup[key] = {
+                        item: item,
+                        location: location,
+                        counted: getCountedQuantity(stocktake, item.id, location.id) || 0
+                    };
+
+                    // Index by serial numbers
+                    if (item.isSerialised && location.serialNumbers && location.serialNumbers.length > 0) {
+                        location.serialNumbers.forEach(serial => {
+                            // Use serial number as key
+                            if (serial.serialNumber && serial.serialNumber.trim() !== '') {
+                                lookup[serial.serialNumber] = {
+                                    item: item,
+                                    location: location,
+                                    serial: serial,
+                                    isSerialMatch: true,
+                                    counted: serial.found
+                                };
+                                serialCount++;
+                            }
+                        });
+                    }
+                });
+
+                // Index by UPC code (case-insensitive)
+                if (item.supplierPartCode && item.supplierPartCode.trim() !== '') {
+                    const upcKey = item.supplierPartCode.toLowerCase().trim();
+                    if (!lookup[upcKey]) {
+                        // Use the first stock location for UPC matching
+                        const firstLocation = item.stockLocations && item.stockLocations.length > 0
+                            ? item.stockLocations[0]
+                            : { id: 'zero-stock', name: 'General Stock', stockBinName: 'General' };
+
+                        lookup[upcKey] = {
+                            item: item,
+                            location: firstLocation,
+                            counted: getCountedQuantity(stocktake, item.id, firstLocation.id) || 0,
+                            isUPCMatch: true
+                        };
+                        upcCount++;
+                    }
+                }
+            });
+
+            console.log(`📊 Lookup built: ${itemCount} items, ${serialCount} serials, ${upcCount} UPCs`);
+            console.log('🔍 Sample lookup keys:', Object.keys(lookup).slice(0, 10));
+            return lookup;
+        }
+
+        // Count how many items have been scanned
+        function countScannedItems(stocktake) {
+            let count = 0;
+            stocktake.countedData?.items?.forEach(item => {
+                item.stockLocations?.forEach(location => {
+                    if (location.countedQuantity > 0 || location.serialNumbers?.some(s => s.found)) {
+                        count++;
+                    }
+                });
+            });
+            return count;
+        }
+
+        // Count total scans
+        function countTotalScans(stocktake) {
+            let total = 0;
+            stocktake.countedData?.items?.forEach(item => {
+                item.stockLocations?.forEach(location => {
+                    total += location.countedQuantity || 0;
+                    location.serialNumbers?.forEach(serial => {
+                        if (serial.found) total++;
+                    });
+                });
+            });
+            return total;
+        }
+
+        // Render compact scanned items list
+        function renderScannedItemsList(stocktake, barcodeLookup) {
+            let html = '';
+            const scannedItems = [];
+
+            // Collect all scanned items
+            stocktake.countedData?.items?.forEach(item => {
+                item.stockLocations?.forEach(location => {
+                    const hasActivity = location.countedQuantity > 0 ||
+                        location.serialNumbers?.some(s => s.found) ||
+                        location.additionalSerials?.length > 0;
+
+                    if (hasActivity) {
+                        const haloItem = stocktake.haloData?.items?.find(i => i.id === item.id);
+                        scannedItems.push({
+                            item: haloItem,
+                            location: location,
+                            countedQuantity: location.countedQuantity || 0,
+                            foundSerials: (location.serialNumbers?.filter(s => s.found) || []).length,
+                            totalSerials: location.serialNumbers?.length || 0,
+                            additionalSerials: location.additionalSerials?.length || 0
+                        });
+                    }
+                });
+            });
+
+            if (scannedItems.length === 0) {
+                return `
+                    <div style="padding: 40px; text-align: center; color: #666;">
+                        <div style="font-size: 2em; margin-bottom: 10px;">📷</div>
+                        <div>No items scanned yet. Start scanning barcodes!</div>
+                    </div>
+                `;
+            }
+
+            // Sort by most recent activity
+            scannedItems.sort((a, b) => b.countedQuantity - a.countedQuantity);
+
+            html += `
+                <table class="inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>SKU/PLU</th>
+                            <th>Location</th>
+                            <th>Counted</th>
+                            <th>Expected</th>
+                            <th>Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            scannedItems.forEach((scannedItem, index) => {
+                const item = scannedItem.item;
+                const location = scannedItem.location;
+                const isSerialised = item.isSerialised;
+                const isOverstock = scannedItem.countedQuantity > (location.expectedQuantity || 0);
+
+                html += `
+                    <tr class="scanned-item-row"
+                        style="cursor: pointer;"
+                        onclick="toggleItemDetails('${item.id}-${location.id}')"
+                        onmouseover="this.style.background='#f7fafc'"
+                        onmouseout="this.style.background='white'">
+                        <td style="font-weight: 500;">${item.name}</td>
+                        <td style="font-family: monospace; font-size: 0.85em;">${item.supplierPartCode || 'N/A'}</td>
+                        <td>${location.stockBinName || location.name}</td>
+                        <td style="text-align: center;">
+                            <span style="font-weight: 700; color: ${isOverstock ? '#48bb78' : '#667eea'};">
+                                ${isSerialised ?
+                                    (scannedItem.countedQuantity > scannedItem.totalSerials ?
+                                    `${scannedItem.countedQuantity}/${scannedItem.totalSerials}` :
+                                    `${scannedItem.foundSerials}/${scannedItem.totalSerials}`) :
+                                    scannedItem.countedQuantity
+                                }
+                            </span>
+                        </td>
+                        <td style="text-align: center;">${location.expectedQuantity}</td>
+                        <td style="text-align: center;">
+                            <span class="serial-badge ${item.isSerialised ? 'yes' : 'no'}">
+                                ${item.isSerialised ? 'Serial' : 'Qty'}
+                            </span>
+                            <span style="color: #999; margin-left: 5px;">▼</span>
+                        </td>
+                    </tr>
+                    <tr id="details-${item.id}-${location.id}" style="display: none;">
+                        <td colspan="6" style="padding: 15px; background: #f7fafc;">
+                            ${renderItemDetails(stocktake.id, item, location, scannedItem)}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+
+            return html;
+        }
+
+        // Render item details when expanded
+        function renderItemDetails(stocktakeId, item, location, scannedItem) {
+            let html = '';
+
+            if (item.isSerialised) {
+                html += `<div style="font-weight: 600; margin-bottom: 10px;">🔢 Serial Numbers</div>`;
+                html += `<div style="max-height: 200px; overflow-y: auto;">`;
+
+                location.serialNumbers?.forEach(serial => {
+                    html += `
+                        <div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+                            <input type="checkbox"
+                                ${serial.found ? 'checked' : ''}
+                                onchange="updateSerialFound('${stocktakeId}', ${item.id}, ${location.id}, ${serial.id}, this.checked)"
+                                style="margin-right: 10px;">
+                            <span style="font-family: monospace; flex: 1;">${serial.serialNumber}</span>
+                            <span style="font-size: 0.8em; padding: 2px 8px; border-radius: 4px; background: ${serial.found ? '#d4edda' : '#f8d7da'}; color: ${serial.found ? '#155724' : '#721c24'};">
+                                ${serial.found ? '✓ Found' : '✗ Missing'}
+                            </span>
+                        </div>
+                    `;
+                });
+
+                html += `</div>`;
+
+                if (scannedItem.additionalSerials > 0) {
+                    html += `<div style="margin-top: 15px; padding: 10px; background: #d4edda; border-radius: 4px;">
+                        ➕ ${scannedItem.additionalSerials} additional serial(s) found
+                    </div>`;
+                }
+            } else {
+                html += `
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <label style="font-weight: 600;">Counted Quantity:</label>
+                        <input type="number"
+                            min="0"
+                            value="${scannedItem.countedQuantity}"
+                            style="width: 100px; padding: 8px; border: 2px solid #e2e8f0; border-radius: 4px; font-size: 16px;"
+                            onchange="updateCountedQuantity('${stocktakeId}', ${item.id}, ${location.id}, this.value)">
+                        <span style="color: #666;">Expected: ${location.expectedQuantity}</span>
+                    </div>
+                `;
+            }
+
+            return html;
+        }
+
+        // Toggle item details visibility
+        function toggleItemDetails(itemId) {
+            const details = document.getElementById(`details-${itemId}`);
+            if (details) {
+                details.style.display = details.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        // Toggle inventory summary visibility
+        function toggleInventorySummary() {
+            const content = document.getElementById('inventorySummaryContent');
+            const icon = document.getElementById('inventoryToggleIcon');
+
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                content.classList.add('expanded');
+                icon.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        // Render complete inventory summary table
+        function renderInventorySummaryTable(stocktake) {
+            let html = `
+                <table class="inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Item Name</th>
+                            <th>SKU/PLU</th>
+                            <th>Location</th>
+                            <th>Expected</th>
+                            <th>Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            // Sort items by name for better readability
+            const sortedItems = [...stocktake.haloData.items].sort((a, b) => a.name.localeCompare(b.name));
+
+            sortedItems.forEach(item => {
+                item.stockLocations?.forEach(location => {
+                    html += `
+                        <tr>
+                            <td style="font-weight: 500;">${item.name}</td>
+                            <td style="font-family: monospace; font-size: 0.85em;">${item.supplierPartCode || 'N/A'}</td>
+                            <td>${location.stockBinName || location.name}</td>
+                            <td style="text-align: center;">${location.expectedQuantity || 0}</td>
+                            <td style="text-align: center;">
+                                <span class="serial-badge ${item.isSerialised ? 'yes' : 'no'}">
+                                    ${item.isSerialised ? 'Serial' : 'Qty'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+
+            return html;
+        }
+
+        // Handle barcode scanning
+        function handleBarcodeScan(event, stocktakeId) {
+            if (event.key === 'Enter') {
+                processBarcode(stocktakeId);
+            }
+        }
+
+        // Audio feedback functions using Web Audio API
+        let audioContext = null;
+
+        function initAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioContext;
+        }
+
+        function playSuccessSound() {
+            try {
+                const ctx = initAudioContext();
+                const oscillator = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(ctx.destination);
+
+                // Create a pleasant "ding" sound
+                oscillator.frequency.setValueAtTime(880, ctx.currentTime); // A5
+                oscillator.type = 'sine';
+
+                gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+
+                oscillator.start(ctx.currentTime);
+                oscillator.stop(ctx.currentTime + 0.1);
+            } catch (e) {
+                console.log('Audio play failed:', e);
+            }
+        }
+
+        function playErrorSound() {
+            try {
+                const ctx = initAudioContext();
+                const oscillator = ctx.createOscillator();
+                const gainNode = ctx.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(ctx.destination);
+
+                // Create a low "donk" sound
+                oscillator.frequency.setValueAtTime(200, ctx.currentTime); // Low pitch
+                oscillator.type = 'square';
+
+                gainNode.gain.setValueAtTime(0.2, ctx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+
+                oscillator.start(ctx.currentTime);
+                oscillator.stop(ctx.currentTime + 0.15);
+            } catch (e) {
+                console.log('Audio play failed:', e);
+            }
+        }
+
+        // Process barcode input
+        async function processBarcode(stocktakeId) {
+            const input = document.getElementById('barcodeInput');
+            const barcode = input.value.trim();
+
+            if (!barcode) return;
+
+            console.log('🎯 Scanning barcode:', barcode);
+
+            // Show scanning activity
+            showActivity(`🔍 Scanning: ${barcode}...`);
+
+            try {
+                const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
+                const barcodeLookup = buildBarcodeLookup(stocktake);
+
+                console.log('📋 Lookup has barcode:', barcodeLookup[barcode] ? 'YES' : 'NO');
+                if (barcodeLookup[barcode]) {
+                    console.log('🔍 Match details:', barcodeLookup[barcode]);
+                }
+
+                let matched = false;
+
+                // First try exact UPC code match
+                for (const key in barcodeLookup) {
+                    const entry = barcodeLookup[key];
+                    if (!entry.isSerialMatch && entry.item && entry.item.supplierPartCode) {
+                        // Case-insensitive UPC match
+                        if (entry.item.supplierPartCode.toLowerCase() === barcode.toLowerCase()) {
+                            const item = entry.item;
+                            const location = entry.location;
+
+                            // Check if item is serialised
+                            const stocktakeItem = stocktake.countedData?.items?.find(i => i.id === item.id);
+                            const locationData = stocktakeItem?.stockLocations?.find(l => l.id === location.id);
+                            const isSerialised = locationData?.serialNumbers?.length > 0;
+
+                            if (isSerialised) {
+                                // Serialised item - show serial selection popup
+                                showSerialSelectionPopup(item, location, locationData, stocktakeId);
+                                playErrorSound(); // Donk sound for serialised items
+                                showActivity(`⚠️ ${item.name} is serialised - Select serials to count`);
+                                matched = true;
+                                break;
+                            } else {
+                                // Non-serialised item - auto-increment as normal
+                                const newCount = (entry.counted || 0) + 1;
+
+                                await apiCall('/api/update-quantity', {
+                                    method: 'POST',
+                                    body: {
+                                        stocktakeId,
+                                        itemId: item.id,
+                                        locationId: location.id,
+                                        countedQuantity: newCount
+                                    }
+                                });
+
+                                showActivity(`✅ ${item.name} @ ${location.stockBinName || location.name} (${newCount} total)`);
+                                playSuccessSound();
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // If no UPC match, try exact serial number match
+                if (!matched && barcodeLookup[barcode] && barcodeLookup[barcode].isSerialMatch) {
+                    const match = barcodeLookup[barcode];
+                    const serial = match.serial;
+
+                    console.log('🔢 Serial match found:', match.item.name, 'Serial:', barcode, 'Found status:', serial.found);
+
+                    if (!serial.found) {
+                        await apiCall('/api/update-serial', {
+                            method: 'POST',
+                            body: {
+                                stocktakeId,
+                                itemId: match.item.id,
+                                locationId: match.location.id,
+                                serialId: serial.id,
+                                found: true
+                            }
+                        });
+
+                        showActivity(`✅ ${match.item.name} - ${barcode} (Serial)`);
+                        playSuccessSound();
+                        matched = true;
+                    } else {
+                        showActivity(`⚠️ ${barcode} already scanned (${match.item.name})`);
+                        playSuccessSound(); // Use success sound since it's a valid serial
+                        matched = true; // Don't fall through to other matching methods
+                    }
+                }
+
+                // If no serial match, try to find by partial name match (more strict)
+                if (!matched) {
+                    for (const key in barcodeLookup) {
+                        const entry = barcodeLookup[key];
+                        if (!entry.isSerialMatch && entry.item) {
+                            const item = entry.item;
+                            const location = entry.location;
+
+                            // Only match if barcode is at least 3 characters and is a significant part of the item name
+                            const barcodeLower = barcode.toLowerCase();
+                            const itemNameLower = item.name.toLowerCase();
+
+                            // Must be at least 3 chars and must match a significant portion (at least 50% of barcode or at start of name)
+                            const isSignificantMatch = barcodeLower.length >= 3 && (
+                                itemNameLower.startsWith(barcodeLower) || // barcode matches start of item name
+                                (itemNameLower.includes(barcodeLower) && barcodeLower.length >= 4) // OR barcode is 4+ chars and found in name
+                            );
+
+                            if (isSignificantMatch) {
+                                const newCount = (entry.counted || 0) + 1;
+                                await apiCall('/api/update-quantity', {
+                                    method: 'POST',
+                                    body: {
+                                        stocktakeId,
+                                        itemId: item.id,
+                                        locationId: location.id,
+                                        countedQuantity: newCount
+                                    }
+                                });
+
+                                showActivity(`✅ ${item.name} @ ${location.stockBinName || location.name} (${newCount} total)`);
+                                playSuccessSound();
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!matched) {
+                    console.log('❌ No match found for barcode:', barcode);
+                    console.log('Available keys in lookup:', Object.keys(barcodeLookup).filter(k => k.length < 20).slice(0, 20));
+                    showActivity(`❌ No match found for: ${barcode}`);
+                    playErrorSound();
+                }
+
+                // Clear input and refresh
+                input.value = '';
+                loadActiveStocktake();
+
+            } catch (error) {
+                console.error('Barcode processing error:', error);
+                showActivity(`❌ Error: ${error.message}`);
+                playErrorSound();
+            }
+        }
+
+        // Item search and dropdown functionality
+        let selectedItemData = null;
+        let searchTimeout = null;
+
+        function handleItemSearch(searchTerm, stocktakeId) {
+            clearTimeout(searchTimeout);
+
+            if (!searchTerm || searchTerm.length < 2) {
+                hideDropdown();
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                performItemSearch(searchTerm, stocktakeId);
+            }, 300); // Debounce for 300ms
+        }
+
+        async function performItemSearch(searchTerm, stocktakeId) {
+            try {
+                const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
+                const matches = [];
+
+                const searchLower = searchTerm.toLowerCase();
+
+                // Search through all items
+                stocktake.haloData?.items?.forEach(item => {
+                    const nameMatch = item.name.toLowerCase().includes(searchLower);
+                    const skuMatch = item.supplierPartCode && item.supplierPartCode.toLowerCase().includes(searchLower);
+
+                    if (nameMatch || skuMatch) {
+                        item.stockLocations?.forEach(location => {
+                            matches.push({
+                                item: item,
+                                location: location,
+                                matchType: nameMatch ? 'name' : 'sku',
+                                matchReason: nameMatch ? 'Name match' : `SKU: ${item.supplierPartCode}`
+                            });
+                        });
+                    }
+                });
+
+                if (matches.length > 0) {
+                    showDropdown(matches);
+                } else {
+                    hideDropdown();
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }
+
+        function showDropdown(matches) {
+            const dropdown = document.getElementById('dropdownSuggestions');
+
+            let html = matches.slice(0, 10).map((match, index) => `
+                <div class="dropdown-item" onclick="selectItemForQuantity(${index})" data-index="${index}">
+                    <div class="dropdown-item-name">${match.item.name}</div>
+                    <div class="dropdown-item-details">
+                        <span class="dropdown-item-sku">${match.item.supplierPartCode || 'N/A'}</span>
+                        • 📍 ${match.location.stockBinName || match.location.name}
+                        ${match.item.isSerialised ? ' • 🔢 Serialised' : ` • 📦 Qty: ${match.location.expectedQuantity}`}
+                    </div>
+                </div>
+            `).join('');
+
+            dropdown.innerHTML = html;
+            dropdown.classList.add('show');
+
+            // Store matches globally for selection
+            window.dropdownMatches = matches;
+        }
+
+        function hideDropdown() {
+            const dropdown = document.getElementById('dropdownSuggestions');
+            dropdown.classList.remove('show');
+            dropdown.innerHTML = '';
+            window.dropdownMatches = [];
+        }
+
+        function selectItemForQuantity(index) {
+            const match = window.dropdownMatches[index];
+            if (!match) return;
+
+            selectedItemData = match;
+
+            // Hide dropdown and clear input
+            hideDropdown();
+            document.getElementById('barcodeInput').value = '';
+
+            // Show quantity modal
+            showQuantityModal(match);
+        }
+
+        function showQuantityModal(match) {
+            const modal = document.getElementById('quantityInputModal');
+            const itemName = document.getElementById('modalItemName');
+            const quantityInput = document.getElementById('modalQuantity');
+
+            itemName.textContent = `${match.item.name} @ ${match.location.stockBinName || match.location.name}`;
+            quantityInput.value = 1;
+            quantityInput.focus();
+
+            modal.classList.add('show');
+        }
+
+        function closeQuantityModal() {
+            const modal = document.getElementById('quantityInputModal');
+            modal.classList.remove('show');
+            selectedItemData = null;
+        }
+
+        async function confirmQuantityModal() {
+            if (!selectedItemData) return;
+
+            const quantityInput = document.getElementById('modalQuantity');
+            const quantity = parseInt(quantityInput.value);
+
+            if (!quantity || quantity < 1) {
+                alert('Please enter a valid quantity');
+                return;
+            }
+
+            try {
+                // Get current stocktake ID from localStorage
+                const stocktakeId = localStorage.getItem('activeStocktakeId');
+
+                // Get current quantity
+                const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
+                const currentQuantity = getCountedQuantity(stocktake, selectedItemData.item.id, selectedItemData.location.id) || 0;
+                const newQuantity = currentQuantity + quantity;
+
+                // Update quantity
+                await apiCall('/api/update-quantity', {
+                    method: 'POST',
+                    body: {
+                        stocktakeId,
+                        itemId: selectedItemData.item.id,
+                        locationId: selectedItemData.location.id,
+                        countedQuantity: newQuantity
+                    }
+                });
+
+                showActivity(`✅ Added ${quantity} to ${selectedItemData.item.name} (Total: ${newQuantity})`);
+                playSuccessSound();
+
+                // Close modal and refresh
+                closeQuantityModal();
+                loadActiveStocktake();
+
+            } catch (error) {
+                console.error('Error adding quantity:', error);
+                alert('Failed to add quantity: ' + error.message);
+            }
+        }
+
+        // Serial selection functionality
+        let currentSerialSelection = {
+            item: null,
+            location: null,
+            locationData: null,
+            stocktakeId: null
+        };
+
+        function showSerialSelectionPopup(item, location, locationData, stocktakeId) {
+            currentSerialSelection = {
+                item,
+                location,
+                locationData,
+                stocktakeId
+            };
+
+            const modal = document.getElementById('serialSelectionModal');
+            const itemName = document.getElementById('serialModalItemName');
+            const serialList = document.getElementById('serialSelectionList');
+            const selectedCount = document.getElementById('selectedCount');
+
+            itemName.textContent = `${item.name} @ ${location.stockBinName || location.name}`;
+
+            // Calculate counts
+            const totalSerials = locationData.serialNumbers?.length || 0;
+            const foundSerials = locationData.serialNumbers?.filter(s => s.found).length || 0;
+            const currentCount = locationData.countedQuantity || 0;
+
+            // Update count display
+            document.getElementById('expectedCount').textContent = totalSerials;
+            document.getElementById('foundCount').textContent = foundSerials;
+            document.getElementById('totalCounted').textContent = currentCount;
+
+            // Show overstock option if all serials are counted
+            const overstockOption = document.getElementById('overstockOption');
+            if (foundSerials === totalSerials && totalSerials > 0) {
+                overstockOption.style.display = 'block';
+            } else {
+                overstockOption.style.display = 'none';
+            }
+
+            // Build serial list
+            let html = '';
+            locationData.serialNumbers?.forEach((serial, index) => {
+                const disabled = serial.found ? 'disabled' : '';
+                const foundClass = serial.found ? 'found' : '';
+                const statusClass = serial.found ? 'found' : 'missing';
+                const statusText = serial.found ? '✓ Already counted' : '○ Not counted';
+
+                html += `
+                    <div class="serial-selection-item ${foundClass}" data-index="${index}">
+                        <div class="serial-info">
+                            <div>
+                                <input type="checkbox" class="serial-checkbox" ${disabled} data-index="${index}">
+                                <span class="serial-number">${serial.serialNumber}</span>
+                            </div>
+                            <span class="serial-status ${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            serialList.innerHTML = html;
+            selectedCount.textContent = '0';
+            modal.classList.add('show');
+
+            // Add event listeners to serial items
+            const serialItems = serialList.querySelectorAll('.serial-selection-item');
+            serialItems.forEach(item => {
+                if (!item.classList.contains('found')) {
+                    item.addEventListener('click', (e) => {
+                        const checkbox = item.querySelector('.serial-checkbox');
+                        checkbox.checked = !checkbox.checked;
+                        item.classList.toggle('selected', checkbox.checked);
+                        updateSelectedCount();
+                    });
+                }
+            });
+
+            // Add event listeners to checkboxes
+            const checkboxes = serialList.querySelectorAll('.serial-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    const item = e.target.closest('.serial-selection-item');
+
+                    if (!item.classList.contains('found')) {
+                        item.classList.toggle('selected', e.target.checked);
+                        updateSelectedCount();
+                    }
+                });
+            });
+        }
+
+        function updateSelectedCount() {
+            const checkboxes = document.querySelectorAll('.serial-checkbox:not(:disabled)');
+            const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+            document.getElementById('selectedCount').textContent = selectedCount;
+        }
+
+        function closeSerialModal() {
+            const modal = document.getElementById('serialSelectionModal');
+            modal.classList.remove('show');
+            currentSerialSelection = null;
+        }
+
+        async function incrementOverstockCount() {
+            if (!currentSerialSelection) return;
+
+            try {
+                console.log('Current serial selection:', currentSerialSelection);
+
+                // Get current stocktake data to find the real counted quantity
+                const stocktake = await apiCall(`/api/stocktake/${currentSerialSelection.stocktakeId}`);
+                const countedItem = stocktake.countedData?.items?.find(i => i.id === currentSerialSelection.item.id);
+                const countedLocation = countedItem?.stockLocations?.find(l => l.id === currentSerialSelection.location.id);
+
+                console.log('Counted item:', countedItem);
+                console.log('Counted location:', countedLocation);
+
+                if (!countedLocation) {
+                    alert('Could not find location data');
+                    return;
+                }
+
+                // Get the real counted quantity
+                const foundSerials = countedLocation.serialNumbers?.filter(s => s.found).length || 0;
+                const currentCount = countedLocation.countedQuantity || foundSerials;
+                const newCount = currentCount + 1;
+
+                console.log(`Incrementing ${currentSerialSelection.item.name} from ${currentCount} to ${newCount}`);
+                console.log(`Found serials: ${foundSerials}, Total serials: ${currentSerialSelection.locationData.serialNumbers?.length || 0}`);
+
+                await apiCall('/api/update-quantity', {
+                    method: 'POST',
+                    body: {
+                        stocktakeId: currentSerialSelection.stocktakeId,
+                        itemId: currentSerialSelection.item.id,
+                        locationId: currentSerialSelection.location.id,
+                        countedQuantity: newCount
+                    }
+                });
+
+                showActivity(`✅ Overstock: ${currentSerialSelection.item.name} incremented to ${newCount} total (${currentSerialSelection.locationData.serialNumbers?.length || 0} expected)`);
+                playSuccessSound();
+
+                // Close modal and refresh
+                closeSerialModal();
+                loadActiveStocktake();
+
+            } catch (error) {
+                console.error('Error incrementing overstock count:', error);
+                alert('Failed to increment count: ' + error.message);
+            }
+        }
+
+        async function confirmSerialModal() {
+            if (!currentSerialSelection) return;
+
+            const checkboxes = document.querySelectorAll('.serial-checkbox:not(:disabled):checked');
+            const selectedSerials = Array.from(checkboxes).map(cb => {
+                const item = cb.closest('.serial-selection-item');
+                const index = parseInt(item.dataset.index);
+                return currentSerialSelection.locationData.serialNumbers[index];
+            });
+
+            if (selectedSerials.length === 0) {
+                alert('Please select at least one serial number to count');
+                return;
+            }
+
+            try {
+                // Mark each selected serial as found
+                for (const serial of selectedSerials) {
+                    await apiCall('/api/update-serial', {
+                        method: 'POST',
+                        body: {
+                            stocktakeId: currentSerialSelection.stocktakeId,
+                            itemId: currentSerialSelection.item.id,
+                            locationId: currentSerialSelection.location.id,
+                            serialId: serial.id,
+                            found: true
+                        }
+                    });
+                }
+
+                showActivity(`✅ Counted ${selectedSerials.length} serials for ${currentSerialSelection.item.name}`);
+                playSuccessSound();
+
+                // Close modal and refresh
+                closeSerialModal();
+                loadActiveStocktake();
+
+            } catch (error) {
+                console.error('Error updating serials:', error);
+                alert('Failed to update serials: ' + error.message);
+            }
+        }
+
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('dropdownSuggestions');
+            const input = document.getElementById('barcodeInput');
+
+            if (dropdown && !dropdown.contains(event.target) && event.target !== input) {
+                hideDropdown();
+            }
+        });
+
+        // Show scanning activity
+        function showActivity(message) {
+            const activityDiv = document.getElementById('recentActivity');
+            if (activityDiv) {
+                activityDiv.innerHTML = `
+                    <div style="font-weight: 600; color: #333;">
+                        ${message}
+                        <div style="font-size: 0.75em; color: #999; margin-top: 5px;">
+                            ${new Date().toLocaleTimeString()}
+                        </div>
+                    </div>
+                `;
+                // Auto-clear after 3 seconds
+                setTimeout(() => {
+                    if (activityDiv.innerHTML.includes(message)) {
+                        activityDiv.innerHTML = `
+                            <div style="font-size: 0.9em; color: #666; text-align: center; padding: 10px;">
+                                📷 Ready to scan items...
+                            </div>
+                        `;
+                    }
+                }, 3000);
+            }
+        }
+
+        // Get counted quantity from stocktake
+        function getCountedQuantity(stocktake, itemId, locationId) {
+            const countedItem = stocktake.countedData?.items?.find(i => i.id === itemId);
+            if (countedItem) {
+                const countedLocation = countedItem.stockLocations?.find(l => l.id === locationId);
+                if (countedLocation) {
+                    return countedLocation.countedQuantity || '';
+                }
+            }
+            return '';
+        }
+
+        // Update counted quantity
+        async function updateCountedQuantity(stocktakeId, itemId, locationId, quantity) {
+            try {
+                await apiCall('/api/update-quantity', {
+                    method: 'POST',
+                    body: { stocktakeId, itemId, locationId, countedQuantity: quantity }
+                });
+                console.log('Quantity updated successfully');
+            } catch (error) {
+                console.error('Failed to update quantity:', error);
+                alert('Failed to update quantity');
+            }
+        }
+
+        // Update serial number found status
+        async function updateSerialFound(stocktakeId, itemId, locationId, serialId, found) {
+            try {
+                await apiCall('/api/update-serial', {
+                    method: 'POST',
+                    body: { stocktakeId, itemId, locationId, serialId, found }
+                });
+                console.log('Serial status updated successfully');
+            } catch (error) {
+                console.error('Failed to update serial status:', error);
+                alert('Failed to update serial status');
+            }
+        }
+
+        // Add additional serial number
+        async function addAdditionalSerial(stocktakeId, itemId, locationId, serialNumber, inputElement) {
+            if (!serialNumber.trim()) return;
+
+            try {
+                await apiCall('/api/add-serial', {
+                    method: 'POST',
+                    body: { stocktakeId, itemId, locationId, serialNumber: serialNumber.trim() }
+                });
+
+                inputElement.value = '';
+                loadActiveStocktake(); // Refresh the interface
+            } catch (error) {
+                console.error('Failed to add serial:', error);
+                alert('Failed to add serial number');
+            }
+        }
+
+        // Complete stocktake
+        async function completeStocktake(stocktakeId) {
+            if (!confirm('Are you sure you want to complete this stocktake? This will generate the final report.')) {
+                return;
+            }
+
+            try {
+                const result = await apiCall('/api/complete-stocktake', {
+                    method: 'POST',
+                    body: { stocktakeId }
+                });
+
+                localStorage.removeItem('activeStocktakeId');
+                alert('Stocktake completed successfully! Report generated.');
+
+                // Switch to reports tab
+                document.querySelector('[data-tab="reports"]').click();
+            } catch (error) {
+                console.error('Failed to complete stocktake:', error);
+                alert('Failed to complete stocktake: ' + error.message);
+            }
+        }
+
+        // Cancel stocktake
+        async function cancelStocktake(stocktakeId) {
+            if (!confirm('Are you sure you want to cancel this stocktake? This action cannot be undone.')) {
+                return;
+            }
+
+            try {
+                // Remove from localStorage
+                localStorage.removeItem('activeStocktakeId');
+
+                // Alert user and redirect to dashboard
+                alert('Stocktake cancelled successfully.');
+
+                // Switch to dashboard tab
+                document.querySelector('[data-tab="dashboard"]').click();
+                loadDashboard();
+            } catch (error) {
+                console.error('Failed to cancel stocktake:', error);
+                alert('Failed to cancel stocktake: ' + error.message);
+            }
+        }
+
+        // Load reports
+        async function loadReports() {
+            try {
+                const stocktakes = await apiCall('/api/stocktakes');
+                const completedStocktakes = stocktakes.filter(s => s.status === 'completed');
+
+                if (completedStocktakes.length === 0) {
+                    document.getElementById('reportsContent').innerHTML = `
+                        <p style="color: #666; text-align: center; padding: 20px;">
+                            No completed stocktakes found.
+                        </p>
+                    `;
+                    return;
+                }
+
+                let html = `
+                    <div class="stocktake-list">
+                        ${completedStocktakes.map(stocktake => `
+                            <div class="stocktake-item">
+                                <h3>${stocktake.name}</h3>
+                                <p>📅 Completed: ${new Date(stocktake.countedData?.completedAt).toLocaleString()}</p>
+                                <button class="button" style="margin-top: 10px; width: 100%;" onclick="viewReport('${stocktake.id}')">
+                                    View Report
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+
+                document.getElementById('reportsContent').innerHTML = html;
+            } catch (error) {
+                document.getElementById('reportsContent').innerHTML = `
+                    <div class="alert error">
+                        Failed to load reports: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // View specific report
+        async function viewReport(stocktakeId) {
+            try {
+                const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
+                const report = stocktake.report;
+
+                if (!report) {
+                    alert('No report available for this stocktake');
+                    return;
+                }
+
+                let html = `
+                    <button class="button secondary" onclick="loadReports()" style="margin-bottom: 20px;">
+                        ← Back to Reports
+                    </button>
+
+                    <div class="card">
+                        <h2>📊 Stocktake Report: ${stocktake.name}</h2>
+                        <p>Generated: ${new Date(report.generatedAt).toLocaleString()}</p>
+
+                        <div class="summary-stats">
+                            <div class="stat-box">
+                                <h3>${report.summary.totalItemsChecked}</h3>
+                                <p>Items Checked</p>
+                            </div>
+                            <div class="stat-box">
+                                <h3>${report.summary.itemsWithVariance}</h3>
+                                <p>With Variance</p>
+                            </div>
+                            <div class="stat-box">
+                                <h3>${report.summary.totalVariance}</h3>
+                                <p>Total Variance</p>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 30px; margin-bottom: 15px;">📈 Location Summaries</h3>
+                        <div>
+                            ${report.locationSummaries.map(loc => `
+                                <div style="padding: 15px; margin-bottom: 10px; background: #f7fafc; border-radius: 8px;">
+                                    <h4>${loc.locationName}</h4>
+                                    <p>Item Variance: ${loc.itemVariance}</p>
+                                    <p>Missing Serials: ${loc.missingSerials}</p>
+                                    <p>Unexpected Serials: ${loc.unexpectedSerials}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                if (report.variances.length > 0) {
+                    html += `
+                        <div class="card">
+                            <h2>⚠️ Variances Found</h2>
+                            <div class="variance-list">
+                                ${report.variances.map(variance => `
+                                    <div class="variance-item ${variance.variance > 0 ? 'positive' : variance.variance < 0 ? 'negative' : 'neutral'}">
+                                        <h4>${variance.itemName} @ ${variance.locationName}</h4>
+                                        <p>Type: ${variance.itemType === 'serialised' ? 'Serialised' : 'Non-Serialised'}</p>
+                                        ${variance.itemType === 'serialised' ? `
+                                            <p>Expected: ${variance.expected} | Found: ${variance.found}</p>
+                                        ` : `
+                                            <p>Expected: ${variance.expected} | Counted: ${variance.counted}</p>
+                                        `}
+                                        <p class="variance-value ${variance.variance > 0 ? 'positive' : variance.variance < 0 ? 'negative' : ''}">
+                                            Variance: ${variance.variance > 0 ? '+' : ''}${variance.variance}
+                                        </p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (report.missingSerials.length > 0) {
+                    html += `
+                        <div class="card">
+                            <h2>❌ Missing Serial Numbers</h2>
+                            <div class="variance-list">
+                                ${report.missingSerials.map(missing => `
+                                    <div class="variance-item negative">
+                                        <h4>${missing.itemName} @ ${missing.locationName}</h4>
+                                        <p>Missing Serials: ${missing.serialNumbers.join(', ')}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (report.unexpectedSerials.length > 0) {
+                    html += `
+                        <div class="card">
+                            <h2>➕ Unexpected Serial Numbers</h2>
+                            <div class="variance-list">
+                                ${report.unexpectedSerials.map(unexpected => `
+                                    <div class="variance-item positive">
+                                        <h4>${unexpected.itemName} @ ${unexpected.locationName}</h4>
+                                        <p>Additional Serials: ${unexpected.serialNumbers.join(', ')}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('reportsContent').innerHTML = html;
+            } catch (error) {
+                alert('Failed to load report: ' + error.message);
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+        });
+    </script>
+</body>
+</html>
