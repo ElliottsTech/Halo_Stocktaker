@@ -20,7 +20,7 @@ The `.env` file is already configured with your Halo API credentials:
 ```
 HALO_CLIENT_ID=your_client_id
 HALO_CLIENT_SECRET=your_client_secret
-HALO_BASE_URL=https://halo.elliotts.tech
+HALO_BASE_URL=url
 PORT=3000
 ```
 
