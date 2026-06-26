@@ -1458,6 +1458,7 @@
                     case 'location':  return (s.location.stockBinName || s.location.name || '').toLowerCase();
                     case 'counted':   return s.countedQuantity;
                     case 'expected':  return s.location.expectedQuantity || 0;
+                    case 'value':     return s.countedQuantity * (s.item.cost || 0);
                     case 'type':      return s.item.isSerialised ? 1 : 0;
                 }
             };
@@ -1536,6 +1537,7 @@
                             ${th('location', 'Location')}
                             ${th('counted', 'Counted')}
                             ${th('expected', 'Expected')}
+                            ${th('value', 'Value')}
                             ${th('type', 'Type')}
                         </tr>
                     </thead>
@@ -1547,6 +1549,14 @@
                 const location = scannedItem.location;
                 const isSerialised = item.isSerialised;
                 const isOverstock = scannedItem.countedQuantity > (location.expectedQuantity || 0);
+
+                // Calculate counted value
+                let countedValue = 0;
+                if (isSerialised) {
+                    countedValue = (location.serialNumbers || []).filter(s => s.found).reduce((sum, s) => sum + (s.cost || item.cost || 0), 0);
+                } else {
+                    countedValue = scannedItem.countedQuantity * (item.cost || 0);
+                }
 
                 html += `
                     <tr class="scanned-item-row"
@@ -1568,6 +1578,7 @@
                             </span>
                         </td>
                         <td style="text-align: center;">${location.expectedQuantity}</td>
+                        <td style="text-align: right; font-family: monospace;">$${countedValue.toFixed(2)}</td>
                         <td style="text-align: center;">
                             <span class="serial-badge ${item.isSerialised ? 'yes' : 'no'}">
                                 ${item.isSerialised ? 'Serial' : 'Qty'}
@@ -1576,7 +1587,7 @@
                         </td>
                     </tr>
                     <tr id="details-${item.id}-${location.id}" style="display: none;">
-                        <td colspan="6" style="padding: 15px; background: #f7fafc;">
+                        <td colspan="7" style="padding: 15px; background: #f7fafc;">
                             ${renderItemDetails(stocktake.id, item, location, scannedItem)}
                         </td>
                     </tr>
@@ -1607,6 +1618,9 @@
                                 onchange="updateSerialFound('${stocktakeId}', ${item.id}, ${location.id}, ${serial.id}, this.checked)"
                                 style="margin-right: 10px;">
                             <span style="font-family: monospace; flex: 1;">${serial.serialNumber}</span>
+                            <span style="font-family: monospace; font-size: 0.85em; color: #666; margin-right: 15px;">
+                                ${(serial.cost || 0) > 0 ? '$' + serial.cost.toFixed(2) : ''}
+                            </span>
                             <span style="font-size: 0.8em; padding: 2px 8px; border-radius: 4px; background: ${serial.found ? '#d4edda' : '#f8d7da'}; color: ${serial.found ? '#155724' : '#721c24'};">
                                 ${serial.found ? '✓ Found' : '✗ Missing'}
                             </span>
@@ -1622,8 +1636,9 @@
                     </div>`;
                 }
             } else {
+                const lineCost = (item.cost || 0) * (scannedItem.countedQuantity || 0);
                 html += `
-                    <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
                         <label style="font-weight: 600;">Counted Quantity:</label>
                         <input type="number"
                             min="0"
@@ -1631,6 +1646,9 @@
                             style="width: 100px; padding: 8px; border: 2px solid #e2e8f0; border-radius: 4px; font-size: 16px;"
                             onchange="updateCountedQuantity('${stocktakeId}', ${item.id}, ${location.id}, this.value)">
                         <span style="color: #666;">Expected: ${location.expectedQuantity}</span>
+                        <span style="color: #666; margin-left: auto;">
+                            Cost: $${(item.cost || 0).toFixed(2)}/ea • Sell: $${(item.price || 0).toFixed(2)}/ea • Line value: $${lineCost.toFixed(2)}
+                        </span>
                     </div>
                 `;
             }
@@ -1670,6 +1688,8 @@
                             <th>SKU/PLU</th>
                             <th>Location</th>
                             <th>Expected</th>
+                            <th>Cost</th>
+                            <th>Price</th>
                             <th>Type</th>
                         </tr>
                     </thead>
@@ -1681,12 +1701,24 @@
 
             sortedItems.forEach(item => {
                 item.stockLocations?.forEach(location => {
+                    // For serialised items, show per-asset cost range if costs vary
+                    let costDisplay = '$' + (item.cost || 0).toFixed(2);
+                    if (item.isSerialised && location.serialNumbers?.length > 0) {
+                        const costs = location.serialNumbers.map(s => s.cost || 0).filter(c => c > 0);
+                        if (costs.length > 0) {
+                            const min = Math.min(...costs);
+                            const max = Math.max(...costs);
+                            costDisplay = min !== max ? `$${min.toFixed(2)}–${max.toFixed(2)}` : `$${min.toFixed(2)}`;
+                        }
+                    }
                     html += `
                         <tr>
                             <td style="font-weight: 500;">${item.name}</td>
                             <td style="font-family: monospace; font-size: 0.85em;">${item.supplierPartCode || 'N/A'}</td>
                             <td>${location.stockBinName || location.name}</td>
                             <td style="text-align: center;">${location.expectedQuantity || 0}</td>
+                            <td style="text-align: right; font-family: monospace;">${costDisplay}</td>
+                            <td style="text-align: right; font-family: monospace;">$${(item.price || 0).toFixed(2)}</td>
                             <td style="text-align: center;">
                                 <span class="serial-badge ${item.isSerialised ? 'yes' : 'no'}">
                                     ${item.isSerialised ? 'Serial' : 'Qty'}
@@ -2577,6 +2609,10 @@
                                 <h3>${report.summary.totalVariance}</h3>
                                 <p>Total Variance</p>
                             </div>
+                            <div class="stat-box">
+                                <h3>$${(report.summary.totalCostImpact || 0).toFixed(2)}</h3>
+                                <p>Cost Impact</p>
+                            </div>
                         </div>
 
                         <h3 style="margin-top: 30px; margin-bottom: 15px;">📈 Location Summaries</h3>
@@ -2610,6 +2646,11 @@
                                         <p class="variance-value ${variance.variance > 0 ? 'positive' : variance.variance < 0 ? 'negative' : ''}">
                                             Variance: ${variance.variance > 0 ? '+' : ''}${variance.variance}
                                         </p>
+                                        ${(variance.costImpact || 0) > 0 ? `
+                                            <p style="font-family: monospace; font-weight: 600;">
+                                                Cost Impact: $${variance.costImpact.toFixed(2)}
+                                            </p>
+                                        ` : ''}
                                     </div>
                                 `).join('')}
                             </div>

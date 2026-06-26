@@ -147,6 +147,8 @@ class StocktakeCreator {
             assetGroupName: item.assetgroup_name || 'Unknown',
             isSerialised: false, // Will be determined based on actual assets found
             supplierPartCode: item.supplier_part_code || '',
+            cost: item.price_cost || 0,
+            price: item.price_retail || 0,
             stockLocations: []
           };
 
@@ -198,7 +200,8 @@ class StocktakeCreator {
                         id: asset.id,
                         serialNumber: asset.inventory_number || asset.serial_number || `Unknown-${asset.id}`,
                         status: asset.status_id === 0 ? 'in_stock' : 'deployed',
-                        userName: asset.username || 'Unassigned'
+                        userName: asset.username || 'Unassigned',
+                        cost: asset.cost || asset.cost_price || asset.purchase_cost || asset.price_cost || 0
                       }));
                       console.log(`Processed ${locationData.serialNumbers.length} serial numbers:`, locationData.serialNumbers);
 
