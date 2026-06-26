@@ -583,6 +583,20 @@
             background: #f7fafc;
         }
 
+        .dropdown-item.active {
+            background: #667eea;
+        }
+
+        .dropdown-item.active .dropdown-item-name,
+        .dropdown-item.active .dropdown-item-details,
+        .dropdown-item.active .dropdown-item-sku {
+            color: white;
+        }
+
+        .dropdown-item.active .dropdown-item-sku {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
         .dropdown-item:last-child {
             border-bottom: none;
         }
@@ -1256,7 +1270,7 @@
                                         placeholder="🔍 Scan PLU, Serial, or type item name..."
                                         style="width: 100%; padding: 15px; font-size: 18px; border: 2px solid #e2e8f0; border-radius: 8px;"
                                         autofocus
-                                        onkeypress="handleBarcodeScan(event, '${stocktake.id}')"
+                                        onkeydown="handleBarcodeScan(event, '${stocktake.id}')"
                                         oninput="handleItemSearch(this.value, '${stocktake.id}')">
                                 </div>
                                 <button class="button" style="padding: 15px 30px; font-size: 16px;" onclick="processBarcode('${stocktake.id}')">
@@ -1422,6 +1436,53 @@
             return total;
         }
 
+        // Sort the scanned items list by the active column (default = most recent)
+        function sortScannedItems(scannedItems) {
+            const col = scannedSortState.column;
+            const dir = scannedSortState.dir === 'asc' ? 1 : -1;
+
+            if (col === null) {
+                // Default: most recently scanned first (fall back to insertion order)
+                scannedItems.sort((a, b) => {
+                    const aTime = a.location.lastCountedAt || '';
+                    const bTime = b.location.lastCountedAt || '';
+                    return bTime.localeCompare(aTime);
+                });
+                return;
+            }
+
+            const getVal = (s) => {
+                switch (col) {
+                    case 'name':      return (s.item.name || '').toLowerCase();
+                    case 'sku':       return (s.item.supplierPartCode || '').toLowerCase();
+                    case 'location':  return (s.location.stockBinName || s.location.name || '').toLowerCase();
+                    case 'counted':   return s.countedQuantity;
+                    case 'expected':  return s.location.expectedQuantity || 0;
+                    case 'type':      return s.item.isSerialised ? 1 : 0;
+                }
+            };
+
+            scannedItems.sort((a, b) => {
+                const av = getVal(a), bv = getVal(b);
+                if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+                return String(av).localeCompare(String(bv)) * dir;
+            });
+        }
+
+        function setScannedSort(col) {
+            if (scannedSortState.column === col) {
+                // Same column clicked: toggle direction, or reset to default after desc
+                if (scannedSortState.dir === 'asc') {
+                    scannedSortState = { column: null, dir: 'desc' };
+                } else {
+                    scannedSortState.dir = 'asc';
+                }
+            } else {
+                scannedSortState = { column: col, dir: 'asc' };
+            }
+            loadActiveStocktake();
+        }
+
         // Render compact scanned items list
         function renderScannedItemsList(stocktake, barcodeLookup) {
             let html = '';
@@ -1457,19 +1518,25 @@
                 `;
             }
 
-            // Sort by most recent activity
-            scannedItems.sort((a, b) => b.countedQuantity - a.countedQuantity);
+            // Apply active sort (default = most recently scanned)
+            sortScannedItems(scannedItems);
+
+            const sortArrow = (col) => {
+                if (scannedSortState.column !== col) return '';
+                return scannedSortState.dir === 'asc' ? ' ▲' : ' ▼';
+            };
+            const th = (col, label) => `<th style="cursor: pointer; user-select: none;" onclick="setScannedSort('${col}')">${label}${sortArrow(col)}</th>`;
 
             html += `
                 <table class="inventory-table">
                     <thead>
                         <tr>
-                            <th>Item Name</th>
-                            <th>SKU/PLU</th>
-                            <th>Location</th>
-                            <th>Counted</th>
-                            <th>Expected</th>
-                            <th>Type</th>
+                            ${th('name', 'Item Name')}
+                            ${th('sku', 'SKU/PLU')}
+                            ${th('location', 'Location')}
+                            ${th('counted', 'Counted')}
+                            ${th('expected', 'Expected')}
+                            ${th('type', 'Type')}
                         </tr>
                     </thead>
                     <tbody>
@@ -1640,8 +1707,34 @@
 
         // Handle barcode scanning
         function handleBarcodeScan(event, stocktakeId) {
-            if (event.key === 'Enter') {
-                processBarcode(stocktakeId);
+            const dropdown = document.getElementById('dropdownSuggestions');
+            const isOpen = dropdown && dropdown.classList.contains('show');
+            const itemCount = (window.dropdownMatches || []).length;
+
+            if (event.key === 'ArrowDown') {
+                if (isOpen && itemCount > 0) {
+                    event.preventDefault();
+                    dropdownActiveIndex = (dropdownActiveIndex + 1) % itemCount;
+                    updateDropdownHighlight();
+                }
+            } else if (event.key === 'ArrowUp') {
+                if (isOpen && itemCount > 0) {
+                    event.preventDefault();
+                    dropdownActiveIndex = (dropdownActiveIndex - 1 + itemCount) % itemCount;
+                    updateDropdownHighlight();
+                }
+            } else if (event.key === 'Escape') {
+                if (isOpen) {
+                    event.preventDefault();
+                    hideDropdown();
+                }
+            } else if (event.key === 'Enter') {
+                if (isOpen && dropdownActiveIndex >= 0) {
+                    event.preventDefault();
+                    selectItemForQuantity(dropdownActiveIndex);
+                } else {
+                    processBarcode(stocktakeId);
+                }
             }
         }
 
@@ -1857,6 +1950,8 @@
         // Item search and dropdown functionality
         let selectedItemData = null;
         let searchTimeout = null;
+        let dropdownActiveIndex = -1;
+        let scannedSortState = { column: null, dir: 'desc' }; // null column = most recent first
 
         function handleItemSearch(searchTerm, stocktakeId) {
             clearTimeout(searchTimeout);
@@ -1924,6 +2019,7 @@
 
             // Store matches globally for selection
             window.dropdownMatches = matches;
+            dropdownActiveIndex = -1;
         }
 
         function hideDropdown() {
@@ -1931,9 +2027,22 @@
             dropdown.classList.remove('show');
             dropdown.innerHTML = '';
             window.dropdownMatches = [];
+            dropdownActiveIndex = -1;
         }
 
-        function selectItemForQuantity(index) {
+        function updateDropdownHighlight() {
+            const items = document.querySelectorAll('#dropdownSuggestions .dropdown-item');
+            items.forEach((item, i) => {
+                if (i === dropdownActiveIndex) {
+                    item.classList.add('active');
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        async function selectItemForQuantity(index) {
             const match = window.dropdownMatches[index];
             if (!match) return;
 
@@ -1943,7 +2052,25 @@
             hideDropdown();
             document.getElementById('barcodeInput').value = '';
 
-            // Show quantity modal
+            // Check if item is serialised (same logic as barcode scanning)
+            const stocktakeId = localStorage.getItem('activeStocktakeId');
+            try {
+                const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
+                const countedItem = stocktake.countedData?.items?.find(i => i.id === match.item.id);
+                const locationData = countedItem?.stockLocations?.find(l => l.id === match.location.id);
+
+                if (locationData?.serialNumbers?.length > 0) {
+                    // Serialised item - show serial selection popup (with overstock if all counted)
+                    showSerialSelectionPopup(match.item, match.location, locationData, stocktakeId);
+                    playErrorSound();
+                    showActivity(`⚠️ ${match.item.name} is serialised - Select serials to count`);
+                    return;
+                }
+            } catch (error) {
+                console.error('Error checking serialisation:', error);
+            }
+
+            // Non-serialised item - show quantity modal
             showQuantityModal(match);
         }
 
@@ -1954,15 +2081,31 @@
 
             itemName.textContent = `${match.item.name} @ ${match.location.stockBinName || match.location.name}`;
             quantityInput.value = 1;
-            quantityInput.focus();
-
             modal.classList.add('show');
+            quantityInput.focus();
+            quantityInput.select();
+
+            // Defer attaching the keydown listener so the keypress that
+            // opened the modal (Enter from the PLU dropdown) doesn't also
+            // confirm it immediately.
+            setTimeout(() => document.addEventListener('keydown', quantityModalKeyHandler), 0);
+        }
+
+        function quantityModalKeyHandler(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                confirmQuantityModal();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                closeQuantityModal();
+            }
         }
 
         function closeQuantityModal() {
             const modal = document.getElementById('quantityInputModal');
             modal.classList.remove('show');
             selectedItemData = null;
+            document.removeEventListener('keydown', quantityModalKeyHandler);
         }
 
         async function confirmQuantityModal() {
@@ -2074,6 +2217,7 @@
             serialList.innerHTML = html;
             selectedCount.textContent = '0';
             modal.classList.add('show');
+            document.addEventListener('keydown', serialModalKeyHandler);
 
             // Add event listeners to serial items
             const serialItems = serialList.querySelectorAll('.serial-selection-item');
@@ -2113,6 +2257,21 @@
             const modal = document.getElementById('serialSelectionModal');
             modal.classList.remove('show');
             currentSerialSelection = null;
+            document.removeEventListener('keydown', serialModalKeyHandler);
+        }
+
+        function serialModalKeyHandler(event) {
+            const overstockOption = document.getElementById('overstockOption');
+            const overstockVisible = overstockOption && overstockOption.style.display !== 'none';
+
+            if (event.key === 'Enter' && overstockVisible) {
+                event.preventDefault();
+                event.stopPropagation();
+                incrementOverstockCount();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                closeSerialModal();
+            }
         }
 
         async function incrementOverstockCount() {
