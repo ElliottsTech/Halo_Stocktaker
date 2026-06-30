@@ -23,8 +23,8 @@ HALO_TOKEN_URL=https://halo.example.com/auth/token
 PORT=3000
 
 # IP allowlist (DNS-resolved; leave empty to disable in dev)
-ALLOWLIST_HOST=ourips.elliotts.tech
-PROXY_IP=172.16.55.10
+ALLOWLIST_HOST=your-allowlist.example.com
+PROXY_IP=10.0.0.1
 ```
 
 Run:
