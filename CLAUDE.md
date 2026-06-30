@@ -129,8 +129,8 @@ Required in `.env`:
 ```
 HALO_CLIENT_ID=your_client_id
 HALO_CLIENT_SECRET=your_client_secret
-HALO_BASE_URL=https://halo.elliotts.tech
-HALO_TOKEN_URL=https://halo.elliotts.tech/auth/token
+HALO_BASE_URL=https://halo.example.com
+HALO_TOKEN_URL=https://halo.example.com/auth/token
 PORT=3000
 ```
 

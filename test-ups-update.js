@@ -88,7 +88,7 @@ async function testUPSUpdate() {
     console.log('\n📡 Step 5: Exact API Call to Execute:');
     console.log('\n```bash');
     console.log(`curl --request POST \\`);
-    console.log(`  --url 'https://halo.elliotts.tech/api/Item' \\`);
+    console.log(`  --url 'https://halo.example.com/api/Item' \\`);
     console.log(`  --header 'Authorization: Bearer YOUR_ACCESS_TOKEN' \\`);
     console.log(`  --header 'Accept: application/json' \\`);
     console.log(`  --header 'Content-Type: application/json' \\`);

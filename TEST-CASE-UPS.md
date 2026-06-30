@@ -29,7 +29,7 @@ Based on the Halo API documentation, here's the exact API call:
 
 ```bash
 curl --request POST \
-  --url 'https://halo.elliotts.tech/api/Item' \
+  --url 'https://halo.example.com/api/Item' \
   --header 'Authorization: Bearer YOUR_ACCESS_TOKEN' \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json' \
@@ -54,7 +54,7 @@ After the update, we can verify with:
 
 ```bash
 curl --request GET \
-  --url 'https://halo.elliotts.tech/api/Item/549' \
+  --url 'https://halo.example.com/api/Item/549' \
   --header 'Authorization: Bearer YOUR_ACCESS_TOKEN' \
   --header 'Accept: application/json'
 ```
