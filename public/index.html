@@ -205,6 +205,106 @@
             display: none;
         }
 
+        .muted {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .labels-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        .labels-table th, .labels-table td {
+            border: 1px solid #e2e8f0;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+            font-size: 0.9em;
+        }
+        .labels-table th {
+            background: #f7fafc;
+            font-weight: 600;
+        }
+        .po-result {
+            padding: 6px 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            cursor: pointer;
+        }
+        .po-result:hover {
+            background: #edf2f7;
+        }
+
+        .label-modes {
+            display: flex;
+            gap: 6px;
+            margin: 14px 0;
+            flex-wrap: wrap;
+        }
+        .label-mode-btn {
+            padding: 6px 14px;
+            border: 2px solid #cbd5e0;
+            background: #f7fafc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .label-mode-btn.active {
+            border-color: #667eea;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .label-mode-pane {
+            margin-top: 8px;
+        }
+        .autocomplete-list {
+            max-height: 280px;
+            overflow-y: auto;
+            margin-top: 4px;
+        }
+
+        .report-table, .report-summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85em;
+        }
+        .report-table th, .report-table td {
+            border: 1px solid #e2e8f0;
+            padding: 5px 8px;
+            vertical-align: top;
+        }
+        .report-table th {
+            background: #f7fafc;
+            font-weight: 600;
+            text-align: left;
+        }
+        .report-table tbody tr:nth-child(even) {
+            background: #fbfcfd;
+        }
+        .report-summary-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .report-summary-table td:first-child { color: #4a5568; }
+
+        @media print {
+            body { background: white !important; }
+            .tabs, .no-print, .header > div:first-child { display: none !important; }
+            #reportsContent > * { display: block !important; }
+            .card {
+                border: 1px solid #cbd5e0 !important;
+                box-shadow: none !important;
+                page-break-inside: avoid;
+                margin-bottom: 10px !important;
+                padding: 8px !important;
+            }
+            .report-table { font-size: 9pt; }
+            .report-table thead { display: table-header-group; }
+            .report-table tr { page-break-inside: avoid; }
+        }
+
         .summary-stats {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -339,7 +439,7 @@
         .tabs {
             display: flex;
             border-bottom: 2px solid #e2e8f0;
-            margin-bottom: 20px;
+            margin-bottom: 0;
             background: #f7fafc;
             padding: 10px 10px 0 10px;
             border-radius: 8px 8px 0 0;
@@ -747,6 +847,7 @@
             <div class="tab" data-tab="create">New Stocktake</div>
             <div class="tab" data-tab="active">Active Stocktake</div>
             <div class="tab" data-tab="reports">Reports</div>
+            <div class="tab" data-tab="labels">Labels</div>
         </div>
 
         <!-- Dashboard Tab -->
@@ -825,6 +926,76 @@
                 </div>
             </div>
         </div>
+
+        <!-- Labels Tab -->
+        <div id="labels" class="tab-content">
+            <div class="card">
+                <h2>🏷️ Label Generator</h2>
+                <p class="muted">Generate shelf labels (Dymo 99010, 28mm × 89mm). Prices include GST.</p>
+
+                <div class="label-modes">
+                    <button class="label-mode-btn active" data-mode="po" onclick="switchLabelMode('po')">Purchase Order</button>
+                    <button class="label-mode-btn" data-mode="product" onclick="switchLabelMode('product')">Product Lookup</button>
+                    <button class="label-mode-btn" data-mode="asset" onclick="switchLabelMode('asset')">Asset / Serial</button>
+                </div>
+
+                <!-- PO mode -->
+                <div id="labelModePo" class="label-mode-pane">
+                    <div class="input-group">
+                        <label for="poSearchInput">Purchase Order</label>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <input type="text" id="poSearchInput" placeholder="e.g., P50128-1 or 50128" style="flex:1; min-width:200px;">
+                            <button class="button" onclick="searchPO()">Search</button>
+                        </div>
+                        <div id="poSearchResults" style="margin-top:8px;"></div>
+                    </div>
+                </div>
+
+                <!-- Product mode -->
+                <div id="labelModeProduct" class="label-mode-pane hidden">
+                    <div class="input-group">
+                        <label for="productSearchInput">Product</label>
+                        <input type="text" id="productSearchInput" placeholder="Type to search products..." autocomplete="off">
+                        <div id="productSuggestions" class="autocomplete-list"></div>
+                        <p id="productHint" class="muted" style="margin-top:4px;">Loading product list...</p>
+                    </div>
+                </div>
+
+                <!-- Asset mode -->
+                <div id="labelModeAsset" class="label-mode-pane hidden">
+                    <div class="input-group">
+                        <label for="assetSearchInput">Asset Tag / Serial</label>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <input type="text" id="assetSearchInput" placeholder="e.g., B368118" style="flex:1; min-width:200px;">
+                            <button class="button" onclick="searchAsset()">Search</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="poContent" class="hidden" style="margin-top:20px;">
+                    <div id="poHeader" style="margin-bottom:12px;"></div>
+
+                    <table class="labels-table" id="labelsTable">
+                        <thead>
+                            <tr>
+                                <th style="width:30px;"><input type="checkbox" id="poSelectAll" onchange="toggleAllLabels(this)"></th>
+                                <th>Item</th>
+                                <th>Source / Qty</th>
+                                <th>Barcode</th>
+                                <th>Price</th>
+                                <th>Labels</th>
+                            </tr>
+                        </thead>
+                        <tbody id="labelsTableBody"></tbody>
+                    </table>
+
+                    <div style="margin-top:16px; display:flex; gap:10px; align-items:center;">
+                        <button class="button" onclick="generateLabelsPDF()" id="generateLabelsBtn">Generate Labels PDF</button>
+                        <span id="labelCountSummary" class="muted"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Quantity Input Modal -->
@@ -882,25 +1053,57 @@
     </div>
 
     <script>
-        // Tab navigation
+        // Tab navigation — syncs with URL hash so refresh/back-forward preserves tab
+        function hashSegments() {
+            const raw = (location.hash || '').replace(/^#/, '');
+            const parts = raw.split('/');
+            return { tab: parts[0] || '', sub: parts[1] || '' };
+        }
+
+        function activateTab(targetTab, pushHistory = true) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            const tabEl = document.querySelector(`.tab[data-tab="${targetTab}"]`);
+            if (tabEl) tabEl.classList.add('active');
+
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            const contentEl = document.getElementById(targetTab);
+            if (contentEl) contentEl.classList.add('active');
+
+            if (pushHistory) {
+                const cur = hashSegments();
+                if (cur.tab !== targetTab) {
+                    history.pushState({ tab: targetTab }, '', `#${targetTab}`);
+                }
+            }
+
+            loadTabContent(targetTab);
+        }
+
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', function() {
                 const targetTab = this.getAttribute('data-tab');
-
-                // Update tab styles
-                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                this.classList.add('active');
-
-                // Show corresponding content
-                document.querySelectorAll('.tab-content').forEach(content => {
-                    content.classList.remove('active');
-                });
-                document.getElementById(targetTab).classList.add('active');
-
-                // Load content for the tab
-                loadTabContent(targetTab);
+                activateTab(targetTab);
             });
         });
+
+        // Back/forward — re-activate tab from hash without pushing new history
+        window.addEventListener('popstate', () => {
+            const { tab } = hashSegments();
+            const valid = ['dashboard', 'create', 'active', 'reports', 'labels'];
+            activateTab(valid.includes(tab) ? tab : 'dashboard', false);
+        });
+
+        // On initial load — jump to tab from URL hash
+        (function initTabFromHash() {
+            const valid = ['dashboard', 'create', 'active', 'reports', 'labels'];
+            const { tab, sub } = hashSegments();
+            const finalTab = valid.includes(tab) ? tab : 'dashboard';
+            // Review sub-mode is read by loadActiveStocktake after the tab activates
+            window.__pendingReviewMode = (finalTab === 'active' && sub === 'review');
+            activateTab(finalTab, tab !== finalTab);
+        })();
 
         // Load content based on active tab
         function loadTabContent(tab) {
@@ -930,7 +1133,12 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`API call failed: ${response.statusText}`);
+                    let detail = response.statusText || '';
+                    try {
+                        const body = await response.json();
+                        if (body && body.error) detail = body.error;
+                    } catch (e) { /* not JSON */ }
+                    throw new Error(`API ${response.status}: ${detail}`);
                 }
 
                 return await response.json();
@@ -939,6 +1147,317 @@
                 throw error;
             }
         }
+
+        // ===== Label Generator =====
+        let currentSource = null;   // { title, subtitle, lines: [{name, description, sell_price, sku, item_id, labels:[]}] }
+        let currentLabelMode = 'po';
+        let productList = null;
+        let productListLoading = false;
+
+        function switchLabelMode(mode) {
+            currentLabelMode = mode;
+            document.querySelectorAll('.label-mode-btn').forEach(b => {
+                b.classList.toggle('active', b.dataset.mode === mode);
+            });
+            ['po', 'product', 'asset'].forEach(m => {
+                document.getElementById('labelMode' + m.charAt(0).toUpperCase() + m.slice(1))
+                    .classList.toggle('hidden', m !== mode);
+            });
+            if (mode === 'product' && !productList && !productListLoading) {
+                loadProductList();
+            }
+        }
+
+        async function loadProductList() {
+            productListLoading = true;
+            const hint = document.getElementById('productHint');
+            try {
+                const data = await apiCall('/api/products');
+                productList = data.products || [];
+                hint.textContent = `${productList.length} products loaded. Start typing to filter.`;
+            } catch (err) {
+                hint.textContent = 'Failed to load product list: ' + err.message;
+            } finally {
+                productListLoading = false;
+            }
+        }
+
+        function filterProducts(q) {
+            if (!productList) return [];
+            const term = q.toLowerCase().trim();
+            if (!term) return [];
+            const matches = [];
+            for (const p of productList) {
+                if ((p.name && p.name.toLowerCase().includes(term)) || String(p.id) === term) {
+                    matches.push(p);
+                    if (matches.length >= 20) break;
+                }
+            }
+            return matches;
+        }
+
+        function renderProductSuggestions(matches) {
+            const el = document.getElementById('productSuggestions');
+            if (matches.length === 0) { el.innerHTML = ''; return; }
+            el.innerHTML = matches.map(p => `
+                <div class="po-result" onclick="selectProduct(${p.id})">
+                    <strong>${escapeHtml(p.name || '')}</strong>
+                    <span class="muted"> — ID ${p.id} • stock: ${p.stock}${p.serialised ? ' (serialised)' : ''}</span>
+                </div>
+            `).join('');
+        }
+
+        async function selectProduct(itemId) {
+            document.getElementById('productSearchInput').value = '';
+            document.getElementById('productSuggestions').innerHTML = '';
+            const content = document.getElementById('poContent');
+            content.classList.remove('hidden');
+            document.getElementById('labelsTableBody').innerHTML = `<tr><td colspan="6" class="muted">Loading product ${itemId}...</td></tr>`;
+            try {
+                const data = await apiCall('/api/products/' + itemId + '/instances');
+                currentSource = {
+                    title: data.name,
+                    subtitle: (data.serialised ? 'Serialised • ' : '') + data.instances.length + ' in-stock instance(s)',
+                    lines: [{
+                        name: data.name,
+                        description: data.description,
+                        sell_price: data.sell_price,
+                        sku: data.sku,
+                        item_id: data.item_id,
+                        instances: data.instances,
+                        labels: data.labels
+                    }]
+                };
+                renderLabelsTable();
+            } catch (err) {
+                document.getElementById('labelsTableBody').innerHTML = `<tr><td colspan="6" class="muted">Failed: ${escapeHtml(err.message)}</td></tr>`;
+                document.getElementById('poHeader').innerHTML = '';
+            }
+        }
+
+        async function searchPO() {
+            const q = document.getElementById('poSearchInput').value.trim();
+            if (!q) return;
+            const resultsEl = document.getElementById('poSearchResults');
+            resultsEl.innerHTML = '<div class="muted">Searching...</div>';
+
+            const directId = parseInt(q, 10);
+            if (directId > 0 && String(directId) === q) {
+                await loadPO(directId);
+                resultsEl.innerHTML = '';
+                return;
+            }
+
+            try {
+                const data = await apiCall('/api/po/search?q=' + encodeURIComponent(q));
+                const results = data.results || [];
+                if (results.length === 0) {
+                    resultsEl.innerHTML = '<div class="muted">No matches. Try numeric ID or ref like P50128-1.</div>';
+                    return;
+                }
+                if (results.length === 1) {
+                    await loadPO(results[0].id);
+                    resultsEl.innerHTML = '';
+                    return;
+                }
+                resultsEl.innerHTML = results.map(r => `
+                    <div class="po-result" onclick="loadPO(${r.id})">
+                        <strong>${escapeHtml(r.po_ref || '(no ref)')}</strong>
+                        <span class="muted"> — ${escapeHtml(r.supplier_name || '')} — ${escapeHtml(r.title || '')}</span>
+                    </div>
+                `).join('');
+            } catch (err) {
+                resultsEl.innerHTML = `<div class="muted">Search failed: ${escapeHtml(err.message)}. Try numeric ID (e.g. 50128).</div>`;
+            }
+        }
+
+        async function loadPO(poId) {
+            const content = document.getElementById('poContent');
+            content.classList.remove('hidden');
+            document.getElementById('labelsTableBody').innerHTML = `<tr><td colspan="6" class="muted">Loading PO ${poId}...</td></tr>`;
+            try {
+                const po = await apiCall('/api/po/' + poId);
+                currentSource = {
+                    title: po.po_ref || ('PO #' + po.id),
+                    subtitle: [po.title, po.supplier_name, po.date].filter(Boolean).join(' • '),
+                    lines: po.lines.map(l => ({
+                        name: l.name,
+                        description: l.description,
+                        sell_price: l.sell_price,
+                        sku: l.sku,
+                        item_id: l.item_id,
+                        qty_received: l.qty_received,
+                        upc: l.upc,
+                        assets: l.assets,
+                        labels: l.labels
+                    }))
+                };
+                renderLabelsTable();
+            } catch (err) {
+                document.getElementById('labelsTableBody').innerHTML = `<tr><td colspan="6" class="muted">Failed: ${escapeHtml(err.message)}</td></tr>`;
+                document.getElementById('poHeader').innerHTML = '';
+            }
+        }
+
+        async function searchAsset() {
+            const q = document.getElementById('assetSearchInput').value.trim();
+            if (!q) return;
+            const content = document.getElementById('poContent');
+            content.classList.remove('hidden');
+            document.getElementById('labelsTableBody').innerHTML = `<tr><td colspan="6" class="muted">Searching asset ${q}...</td></tr>`;
+            try {
+                const data = await apiCall('/api/asset-lookup?q=' + encodeURIComponent(q));
+                currentSource = {
+                    title: data.name,
+                    subtitle: 'Asset ' + (data.instances[0] && data.instances[0].inventory_number || ''),
+                    lines: [{
+                        name: data.name,
+                        description: data.description,
+                        sell_price: data.sell_price,
+                        sku: data.sku,
+                        item_id: data.item_id,
+                        instances: data.instances,
+                        labels: data.labels
+                    }]
+                };
+                renderLabelsTable();
+            } catch (err) {
+                document.getElementById('labelsTableBody').innerHTML = `<tr><td colspan="6" class="muted">Not found or failed: ${escapeHtml(err.message)}</td></tr>`;
+                document.getElementById('poHeader').innerHTML = '';
+            }
+        }
+
+        function renderLabelsTable() {
+            const src = currentSource;
+            document.getElementById('poHeader').innerHTML = `
+                <h3 style="margin:0;">${escapeHtml(src.title || '')}</h3>
+                <div class="muted">${escapeHtml(src.subtitle || '')}</div>
+            `;
+            const tbody = document.getElementById('labelsTableBody');
+            if (!src.lines || src.lines.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="muted">No receivable lines.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = src.lines.map((line, idx) => {
+                let bcSource;
+                if (line.assets && line.assets.length > 0) {
+                    bcSource = 'Asset tags (' + line.assets.length + ')';
+                } else if (line.instances && line.instances.length > 0 && !line.upc) {
+                    bcSource = line.instances[0].label || (line.instances.length + ' instance(s)');
+                } else if (line.upc) {
+                    bcSource = 'UPC ' + escapeHtml(line.upc);
+                } else {
+                    bcSource = 'Item ID ' + line.item_id;
+                }
+                const qtyCell = line.qty_received !== undefined ? line.qty_received : (line.instances ? line.instances.length : '-');
+                return `
+                    <tr>
+                        <td><input type="checkbox" class="po-line-check" data-line-idx="${idx}" checked onchange="updateLabelSummary()"></td>
+                        <td><strong>${escapeHtml(line.name || '')}</strong><br><span class="muted">${escapeHtml(line.description || '')}</span></td>
+                        <td>${qtyCell}</td>
+                        <td>${bcSource}</td>
+                        <td>$${Number(line.sell_price || 0).toFixed(2)}</td>
+                        <td>${line.labels.length}</td>
+                    </tr>
+                `;
+            }).join('');
+            document.getElementById('poSelectAll').checked = true;
+            updateLabelSummary();
+        }
+
+        function toggleAllLabels(master) {
+            document.querySelectorAll('.po-line-check').forEach(c => {
+                c.checked = master.checked;
+            });
+            updateLabelSummary();
+        }
+
+        function updateLabelSummary() {
+            const checks = document.querySelectorAll('.po-line-check');
+            let total = 0;
+            checks.forEach(c => {
+                if (c.checked && currentSource) {
+                    const idx = parseInt(c.dataset.lineIdx, 10);
+                    total += currentSource.lines[idx].labels.length;
+                }
+            });
+            document.getElementById('labelCountSummary').textContent = total + ' label(s) selected';
+        }
+
+        async function generateLabelsPDF() {
+            if (!currentSource) return alert('Load a source first');
+            const selected = [];
+            document.querySelectorAll('.po-line-check').forEach(c => {
+                if (c.checked) {
+                    const idx = parseInt(c.dataset.lineIdx, 10);
+                    const line = currentSource.lines[idx];
+                    for (const label of line.labels) {
+                        selected.push({
+                            name: line.name,
+                            description: line.description,
+                            price: line.sell_price,
+                            sku: line.sku,
+                            item_id: line.item_id,
+                            barcode_type: label.barcode_type,
+                            barcode_value: label.barcode_value
+                        });
+                    }
+                }
+            });
+            if (selected.length === 0) return alert('Select at least one line');
+
+            const btn = document.getElementById('generateLabelsBtn');
+            btn.disabled = true;
+            btn.textContent = 'Generating...';
+            try {
+                const resp = await fetch('/api/labels/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ labels: selected })
+                });
+                if (!resp.ok) throw new Error('Generation failed: ' + resp.status);
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (err) {
+                alert('Failed: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate Labels PDF';
+            }
+        }
+
+        function escapeHtml(s) {
+            if (s === null || s === undefined) return '';
+            return String(s).replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[ch]));
+        }
+
+        function stripEmoji(s) {
+            if (s === null || s === undefined) return '';
+            return String(s).replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️‍]/gu, '').trim();
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Enter') return;
+            const id = document.activeElement && document.activeElement.id;
+            if (id === 'poSearchInput') { e.preventDefault(); searchPO(); }
+            else if (id === 'assetSearchInput') { e.preventDefault(); searchAsset(); }
+        });
+
+        document.addEventListener('input', e => {
+            if (e.target.id === 'productSearchInput') {
+                renderProductSuggestions(filterProducts(e.target.value));
+            }
+        });
+
+        document.addEventListener('click', e => {
+            if (e.target.id !== 'productSearchInput' && !e.target.closest('#productSuggestions')) {
+                document.getElementById('productSuggestions').innerHTML = '';
+            }
+        });
 
         // Load dashboard content
         async function loadDashboard() {
@@ -1228,6 +1747,10 @@
 
             try {
                 const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
+                if (window.__pendingReviewMode) {
+                    reviewMode = true;
+                    delete window.__pendingReviewMode;
+                }
                 renderStocktakeInterface(stocktake);
             } catch (error) {
                 document.getElementById('activeStocktakeContent').innerHTML = `
@@ -1240,6 +1763,13 @@
 
         // Render stocktake counting interface
         function renderStocktakeInterface(stocktake) {
+            currentStocktakeInView = stocktake;
+
+            if (reviewMode) {
+                renderReviewInterface(stocktake);
+                return;
+            }
+
             // Build a lookup map for quick barcode scanning
             const barcodeLookup = buildBarcodeLookup(stocktake);
 
@@ -1251,8 +1781,11 @@
                             <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">📅 ${new Date(stocktake.createdAt).toLocaleString()}</p>
                         </div>
                         <div style="display: flex; gap: 10px;">
-                            <button class="button secondary" style="padding: 8px 16px;" onclick="completeStocktake('${stocktake.id}')">
-                                ✅ Complete
+                            <button class="button ${editMode ? 'secondary' : ''}" style="padding: 8px 16px; ${editMode ? 'background: linear-gradient(135deg, #38b2ac 0%, #2c7a7b 100%); color: white;' : ''}" onclick="toggleEditMode()">
+                                ${editMode ? '✓ Done Editing' : '✏️ Edit'}
+                            </button>
+                            <button class="button" style="padding: 8px 16px; background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);" onclick="showReview('${stocktake.id}')">
+                                🔍 Review & Complete
                             </button>
                             <button class="button danger" style="padding: 8px 16px;" onclick="cancelStocktake('${stocktake.id}')">
                                 ❌ Cancel
@@ -1308,10 +1841,20 @@
                     </div>
                 </div>
 
+                <!-- Edit Mode: Add Items Panel -->
+                <div id="editAddPanel" style="${editMode ? '' : 'display: none;'} margin-bottom: 15px; background: white; border-radius: 8px; border: 2px dashed #38b2ac; padding: 15px;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">➕ Add Item from Halo</div>
+                    <input type="text" id="stocktakeProductSearch" placeholder="Type product name to search..." autocomplete="off"
+                        style="width: 100%; padding: 10px; font-size: 14px; border: 2px solid #e2e8f0; border-radius: 6px;"
+                        oninput="renderStocktakeProductSuggestions(this.value)">
+                    <div id="stocktakeProductSuggestions" class="autocomplete-list"></div>
+                    <div style="font-size: 0.8em; color: #666; margin-top: 6px;">${stocktakeProductList ? stocktakeProductList.length + ' products loaded' : 'Loading product list...'}</div>
+                </div>
+
                 <!-- Scanned Items List -->
                 <div style="background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
                     <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; font-weight: 600; background: #f7fafc; border-radius: 8px 8px 0 0;">
-                        📋 Scanned Items (${countScannedItems(stocktake)} of ${stocktake.summary?.totalItems || 0})
+                        📋 Scanned Items (${countScannedItems(stocktake)} of ${stocktake.summary?.totalItems || 0})${editMode ? ' • 🟢 counted columns editable' : ' • 🔒 counted columns locked (click Edit to modify)'}
                     </div>
                     <div id="scannedItemsList" style="max-height: 400px; overflow-y: auto;">
                         ${renderScannedItemsList(stocktake, barcodeLookup)}
@@ -1341,11 +1884,545 @@
 
             document.getElementById('activeStocktakeContent').innerHTML = html;
 
+            // Restore recent scan log (overwrites template placeholder)
+            renderRecentScans();
+
             // Auto-focus the barcode input
             setTimeout(() => {
                 const barcodeInput = document.getElementById('barcodeInput');
                 if (barcodeInput) barcodeInput.focus();
             }, 100);
+        }
+
+        // Compute variances client-side (mirrors generateDifferentialReport)
+        function computeVariances(stocktake) {
+            const haloById = new Map();
+            (stocktake.haloData?.items || []).forEach(i => haloById.set(i.id, i));
+
+            const variances = [];
+            let itemsChecked = 0;
+
+            (stocktake.countedData?.items || []).forEach(cItem => {
+                const hItem = haloById.get(cItem.id);
+                (cItem.stockLocations || []).forEach(cLoc => {
+                    const hLoc = hItem ? (hItem.stockLocations || []).find(l => l.id === cLoc.id) : null;
+
+                    // Counted activity (or prior expected) with no matching haloData
+                    // — item/location gone after refresh. Surface so user sees resolution.
+                    const foundSerials = (cLoc.serialNumbers || []).filter(s => s.found).length;
+                    const hasCountedQty = cLoc.countedQuantity !== null && cLoc.countedQuantity !== undefined && cLoc.countedQuantity > 0;
+                    const hasActivity = hasCountedQty || foundSerials > 0 || (cLoc.additionalSerials || []).length > 0;
+                    const previousExpected = (cLoc.expectedQuantity || 0) > 0
+                        ? cLoc.expectedQuantity
+                        : (cLoc.serialNumbers || []).length;
+
+                    if (!hItem || !hLoc) {
+                        if (!hasActivity && !previousExpected) return;
+                        itemsChecked++;
+                        const isSerial = (cLoc.serialNumbers || []).length > 0 || foundSerials > 0;
+                        const counted = isSerial ? foundSerials : (cLoc.countedQuantity || 0);
+                        const costImpact = isSerial
+                            ? (cLoc.serialNumbers || []).filter(s => s.found).reduce((sum, s) => sum + (s.cost || 0), 0)
+                            : 0;
+                        variances.push({
+                            itemId: cItem.id, locationId: cLoc.id,
+                            itemType: isSerial ? 'serialised' : 'non_serialised',
+                            itemName: cItem.name,
+                            locationName: cLoc.name || '(removed)',
+                            expected: 0, counted, found: isSerial ? foundSerials : null,
+                            variance: counted,
+                            previousExpected,
+                            costImpact,
+                            missingSerials: [],
+                            additionalSerials: [],
+                            consumedOrRemoved: true,
+                            resolvedByRefresh: previousExpected > 0 && !hasActivity,
+                            reason: cLoc.varianceReason || ''
+                        });
+                        return;
+                    }
+
+                    itemsChecked++;
+
+                    if (hItem.isSerialised) {
+                        const expected = (hLoc.serialNumbers || []).length;
+                        const found = (cLoc.serialNumbers || []).filter(s => s.found).length;
+                        const variance = found - expected;
+                        if (variance !== 0) {
+                            const missingCost = (cLoc.serialNumbers || [])
+                                .filter(s => !s.found)
+                                .reduce((sum, s) => sum + (s.cost || hItem.cost || 0), 0);
+                            const missingSerials = (cLoc.serialNumbers || [])
+                                .filter(s => !s.found)
+                                .map(s => ({
+                                    serialNumber: s.serialNumber || `id:${s.id}`,
+                                    userName: s.userName || ''
+                                }));
+                            const additionalSerials = (cLoc.additionalSerials || [])
+                                .map(s => typeof s === 'string' ? s : (s.serialNumber || `id:${s.id}`));
+                            variances.push({
+                                itemId: cItem.id, locationId: cLoc.id,
+                                itemType: 'serialised', itemName: hItem.name,
+                                locationName: cLoc.name,
+                                expected, counted: found, found,
+                                variance, costImpact: missingCost,
+                                missingSerials, additionalSerials,
+                                reason: cLoc.varianceReason || ''
+                            });
+                        }
+                    } else {
+                        const expected = hLoc.expectedQuantity || 0;
+                        const counted = cLoc.countedQuantity || 0;
+                        const variance = counted - expected;
+                        if (variance !== 0) {
+                            variances.push({
+                                itemId: cItem.id, locationId: cLoc.id,
+                                itemType: 'non_serialised', itemName: hItem.name,
+                                locationName: cLoc.name,
+                                expected, counted, found: null,
+                                variance,
+                                costImpact: Math.abs(variance) * (hItem.cost || 0),
+                                reason: cLoc.varianceReason || ''
+                            });
+                        }
+                    }
+                });
+            });
+
+            const totalAbsVariance = variances.reduce((s, v) => s + Math.abs(v.variance), 0);
+            const costImpact = variances.reduce((s, v) => s + (v.costImpact || 0), 0);
+            return {
+                variances,
+                totals: {
+                    itemsChecked,
+                    withVariance: variances.length,
+                    totalAbsVariance,
+                    costImpact
+                }
+            };
+        }
+
+        // Render review interface (replaces scan UI in same container)
+        function renderReviewInterface(stocktake) {
+            const data = computeVariances(stocktake);
+            const varianceRows = data.variances.map(v => {
+                const cls = v.resolvedByRefresh
+                    ? 'variance-resolved'
+                    : (v.variance < 0 ? 'variance-short' : 'variance-over');
+                const typeLabel = v.itemType === 'serialised' ? '🔑 Serialised' : '📦 Non-serialised';
+                const countedCol = v.itemType === 'serialised' ? `${v.found} found` : v.counted;
+                const expectedCol = v.resolvedByRefresh
+                    ? `<span style="text-decoration: line-through; color: #a0aec0;">${v.previousExpected}</span> → 0`
+                    : v.expected;
+
+                let serialCell = '';
+                if (v.itemType === 'serialised') {
+                    const parts = [];
+                    if ((v.missingSerials || []).length) {
+                        const list = v.missingSerials.map(s =>
+                            `<div style="font-family: monospace; font-size: 0.85em; color: #c53030;">⚠️ ${s.serialNumber}${s.userName && s.userName !== 'Unassigned' ? ` <span style="color:#718096;">(${s.userName})</span>` : ''}</div>`
+                        ).join('');
+                        parts.push(`<div style="margin-top: 4px;"><div style="font-size: 0.75em; color: #718096; text-transform: uppercase;">Missing (${v.missingSerials.length})</div>${list}</div>`);
+                    }
+                    if ((v.additionalSerials || []).length) {
+                        const list = v.additionalSerials.map(sn =>
+                            `<div style="font-family: monospace; font-size: 0.85em; color: #2f855a;">+ ${sn}</div>`
+                        ).join('');
+                        parts.push(`<div style="margin-top: 4px;"><div style="font-size: 0.75em; color: #718096; text-transform: uppercase;">Unexpected (${v.additionalSerials.length})</div>${list}</div>`);
+                    }
+                    serialCell = parts.join('');
+                }
+
+                return `
+                    <tr class="${cls}" data-item="${v.itemId}" data-loc="${v.locationId}">
+                        <td style="text-align: center;">
+                            <input type="checkbox" class="refresh-checkbox"
+                                value="${v.itemId}"
+                                onchange="updateRefreshSelected()"
+                                ${(v.consumedOrRemoved || v.resolvedByRefresh) ? 'disabled title="Item no longer in Halo"' : ''}>
+                        </td>
+                        <td>
+                            <a href="${HALO_BASE_URL}/items?itemid=${v.itemId}" target="_blank" rel="noopener" style="color: #667eea; text-decoration: none; font-weight: 500;">${v.itemName}</a>
+                            ${v.resolvedByRefresh ? '<div style="font-size: 0.75em; color: #38a169; margin-top: 2px;">✓ Resolved by refresh (consigned/removed in Halo)</div>' : ''}
+                            ${serialCell}
+                        </td>
+                        <td>${v.locationName}</td>
+                        <td>${typeLabel}</td>
+                        <td style="text-align: center;">${expectedCol}</td>
+                        <td style="text-align: center;">${countedCol}</td>
+                        <td style="text-align: center; font-weight: 600; color: ${v.variance < 0 ? '#c53030' : '#2f855a'};">
+                            ${v.variance > 0 ? '+' : ''}${v.variance}
+                        </td>
+                        <td style="text-align: right;">$${(v.costImpact || 0).toFixed(2)}</td>
+                        <td>
+                            <input type="text" class="reason-input"
+                                placeholder="Reason for variance..."
+                                value="${(v.reason || '').replace(/"/g, '&quot;')}"
+                                oninput="onReasonInput(${v.itemId}, ${v.locationId}, this.value)"
+                                onblur="flushReason(${v.itemId}, ${v.locationId})">
+                            <span class="reason-saved-tick" id="tick-${v.itemId}-${v.locationId}"></span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            const emptyReasons = data.variances.filter(v => !v.resolvedByRefresh && !(v.reason || '').trim()).length;
+
+            const html = `
+                <style>
+                    .variance-short { background: #fff5f5; }
+                    .variance-over { background: #f0fff4; }
+                    .variance-resolved { background: #f7fafc; opacity: 0.75; }
+                    .reason-input {
+                        width: 100%; min-width: 180px;
+                        padding: 6px 8px;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 4px;
+                        font-size: 0.9em;
+                    }
+                    .reason-input:focus { border-color: #667eea; outline: none; }
+                    .reason-saved-tick { color: #38a169; font-weight: 600; margin-left: 6px; }
+                    .review-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+                    .review-table th { text-align: left; padding: 10px; background: #f7fafc; border-bottom: 2px solid #e2e8f0; font-size: 0.85em; text-transform: uppercase; color: #666; }
+                    .review-table td { padding: 10px; border-bottom: 1px solid #edf2f7; vertical-align: middle; }
+                </style>
+
+                <div class="header" style="background: #f7fafc; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h3 style="margin: 0;">🔍 Review: ${stocktake.name}</h3>
+                            <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">
+                                Check variances, add reasons, then complete or resume scanning.
+                            </p>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="button secondary" style="padding: 8px 16px;" onclick="backToScanning()">
+                                ← Back to Scanning
+                            </button>
+                            <button class="button" style="padding: 8px 16px; background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);" onclick="confirmComplete()">
+                                ✅ Confirm Complete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <div style="flex: 1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5em; font-weight: 600;">${data.totals.itemsChecked}</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">Items Checked</div>
+                    </div>
+                    <div style="flex: 1; background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5em; font-weight: 600;">${data.totals.withVariance}</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">Variances</div>
+                    </div>
+                    <div style="flex: 1; background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5em; font-weight: 600;">${data.totals.totalAbsVariance}</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">Total |Variance|</div>
+                    </div>
+                    <div style="flex: 1; background: linear-gradient(135deg, #38b2ac 0%, #2c7a7b 100%); color: white; padding: 15px; border-radius: 8px; text-align: center;">
+                        <div style="font-size: 1.5em; font-weight: 600;">$${data.totals.costImpact.toFixed(2)}</div>
+                        <div style="font-size: 0.85em; opacity: 0.9;">Cost Impact</div>
+                    </div>
+                </div>
+
+                <div style="background: white; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 15px;">
+                    <div style="padding: 15px; border-bottom: 1px solid #e2e8f0; font-weight: 600; background: #fff5f5; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span>⚠️ Variances (${data.variances.length})</span>
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            ${emptyReasons > 0 ? `<span style="font-size: 0.8em; color: #c53030; font-weight: 400;">${emptyReasons} missing reason${emptyReasons === 1 ? '' : 's'}</span>` : ''}
+                            <span id="lastRefreshedAt" style="font-size: 0.75em; color: #718096; font-weight: 400;">${stocktake.lastRefreshedAt ? `Refreshed ${new Date(stocktake.lastRefreshedAt).toLocaleTimeString()}` : `Extracted ${new Date(stocktake.haloData?.extractedAt || stocktake.createdAt).toLocaleTimeString()}`}</span>
+                            <label style="font-size: 0.85em; font-weight: 400; cursor: pointer;">
+                                <input type="checkbox" id="refreshSelectAll" onchange="toggleAllRefresh(this.checked)" style="vertical-align: middle;"> Select all
+                            </label>
+                            <button class="button secondary" style="padding: 6px 12px; font-size: 0.85em;" onclick="refreshSelectedFromHalo()" id="refreshSelectedBtn" disabled>
+                                🔄 Refresh Selected (0)
+                            </button>
+                        </div>
+                    </div>
+                    ${data.variances.length === 0 ? `
+                        <div style="padding: 30px; text-align: center; color: #38a169;">
+                            ✅ No variances — counted matches expected.
+                        </div>
+                    ` : `
+                        <div style="overflow-x: auto;">
+                            <table class="review-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 30px;"></th>
+                                        <th>Item</th>
+                                        <th>Location</th>
+                                        <th>Type</th>
+                                        <th style="text-align: center;">Expected</th>
+                                        <th style="text-align: center;">Counted</th>
+                                        <th style="text-align: center;">Variance</th>
+                                        <th style="text-align: right;">Cost Impact</th>
+                                        <th>Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${varianceRows}</tbody>
+                            </table>
+                        </div>
+                    `}
+                </div>
+
+                <div class="inventory-summary">
+                    <div class="inventory-summary-header" onclick="toggleInventorySummary()">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.2em;">📦</span>
+                            <div>
+                                <div style="font-weight: 600;">All Counted Items</div>
+                                <div style="font-size: 0.85em; color: #666;">Full breakdown across every location</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 0.85em; color: #666;">Click to expand</span>
+                            <div id="inventoryToggleIcon" style="transition: transform 0.3s ease;">▼</div>
+                        </div>
+                    </div>
+                    <div id="inventorySummaryContent" class="inventory-summary-content">
+                        ${renderInventorySummaryTable(stocktake)}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('activeStocktakeContent').innerHTML = html;
+        }
+
+        // ---- Review handlers ----
+        async function showReview(stocktakeId) {
+            try {
+                const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
+                reviewMode = true;
+                if (location.hash !== '#active/review') {
+                    history.pushState({ tab: 'active', mode: 'review' }, '', '#active/review');
+                }
+                renderStocktakeInterface(stocktake);
+            } catch (error) {
+                alert('Failed to enter review: ' + error.message);
+            }
+        }
+
+        async function backToScanning() {
+            if (!currentStocktakeInView) return;
+            try {
+                const stocktake = await apiCall(`/api/stocktake/${currentStocktakeInView.id}`);
+                reviewMode = false;
+                if (location.hash !== '#active') {
+                    history.pushState({ tab: 'active', mode: 'scan' }, '', '#active');
+                }
+                renderStocktakeInterface(stocktake);
+            } catch (error) {
+                alert('Failed to return to scanning: ' + error.message);
+            }
+        }
+
+        function onReasonInput(itemId, locationId, value) {
+            const key = `${itemId}-${locationId}`;
+            clearTimeout(reasonSaveTimers[key]);
+            reasonSaveTimers[key] = setTimeout(() => saveReason(itemId, locationId, value), 400);
+        }
+
+        function flushReason(itemId, locationId) {
+            const key = `${itemId}-${locationId}`;
+            clearTimeout(reasonSaveTimers[key]);
+            const input = document.querySelector(`tr[data-item="${itemId}"][data-loc="${locationId}"] .reason-input`);
+            saveReason(itemId, locationId, input ? input.value : '');
+        }
+
+        async function saveReason(itemId, locationId, value) {
+            if (!currentStocktakeInView) return;
+            // optimistic local update
+            if (currentStocktakeInView) {
+                const it = (currentStocktakeInView.countedData?.items || []).find(i => i.id === itemId);
+                const loc = it?.stockLocations?.find(l => l.id === locationId);
+                if (loc) loc.varianceReason = value;
+            }
+            const tick = document.getElementById(`tick-${itemId}-${locationId}`);
+            if (tick) { tick.textContent = '⋯'; tick.style.color = '#a0aec0'; }
+            try {
+                await apiCall('/api/update-variance-reason', {
+                    method: 'POST',
+                    body: {
+                        stocktakeId: currentStocktakeInView.id,
+                        itemId, locationId, reason: value
+                    }
+                });
+                if (tick) { tick.textContent = '✓'; tick.style.color = '#38a169'; }
+                setTimeout(() => { if (tick) tick.textContent = ''; }, 1500);
+            } catch (error) {
+                if (tick) { tick.textContent = '✗'; tick.style.color = '#c53030'; }
+            }
+        }
+
+        function updateRefreshSelected() {
+            const checked = document.querySelectorAll('.refresh-checkbox:checked');
+            const btn = document.getElementById('refreshSelectedBtn');
+            if (btn) {
+                btn.disabled = checked.length === 0;
+                btn.textContent = `🔄 Refresh Selected (${checked.length})`;
+            }
+            const all = document.querySelectorAll('.refresh-checkbox:not(:disabled)');
+            const selectAll = document.getElementById('refreshSelectAll');
+            if (selectAll) {
+                selectAll.checked = all.length > 0 && Array.from(all).every(c => c.checked);
+            }
+        }
+
+        function toggleAllRefresh(checked) {
+            document.querySelectorAll('.refresh-checkbox:not(:disabled)').forEach(cb => {
+                cb.checked = checked;
+            });
+            updateRefreshSelected();
+        }
+
+        async function refreshSelectedFromHalo() {
+            if (!currentStocktakeInView) return;
+            const checked = document.querySelectorAll('.refresh-checkbox:checked');
+            if (!checked.length) return;
+            const itemIds = Array.from(checked).map(cb => parseInt(cb.value));
+            if (!confirm(`Refresh ${itemIds.length} item${itemIds.length === 1 ? '' : 's'} from Halo?\n\nExpected quantities/serials will be re-pulled. Counted data is preserved.`)) return;
+
+            const btn = document.getElementById('refreshSelectedBtn');
+            const origText = btn?.textContent;
+            if (btn) { btn.disabled = true; btn.textContent = '🔄 Refreshing...'; }
+            try {
+                const result = await apiCall('/api/refresh-halo', {
+                    method: 'POST',
+                    body: { stocktakeId: currentStocktakeInView.id, itemIds }
+                });
+                currentStocktakeInView = result.stocktake;
+                renderStocktakeInterface(result.stocktake);
+                if (result.consumed?.length) {
+                    console.log(`${result.consumed.length} item(s) no longer in Halo, marked consumed`);
+                }
+            } catch (error) {
+                console.error('Failed to refresh from Halo:', error);
+                alert('Failed to refresh from Halo: ' + error.message);
+                if (btn) { btn.disabled = false; btn.textContent = origText; }
+            }
+        }
+
+        async function refreshSingleItemFromSummary(itemId) {
+            if (!currentStocktakeInView) return;
+            if (!confirm(`Refresh item ${itemId} from Halo?\n\nExpected quantities/serials will be re-pulled. Counted data is preserved.`)) return;
+            try {
+                const result = await apiCall('/api/refresh-halo', {
+                    method: 'POST',
+                    body: { stocktakeId: currentStocktakeInView.id, itemIds: [itemId] }
+                });
+                currentStocktakeInView = result.stocktake;
+                renderStocktakeInterface(result.stocktake);
+                showActivity(`🔄 Refreshed item ${itemId} from Halo`);
+            } catch (error) {
+                console.error('Failed to refresh item:', error);
+                alert('Failed to refresh item: ' + error.message);
+            }
+        }
+
+        function toggleEditMode() {
+            editMode = !editMode;
+            if (editMode && !stocktakeProductList) loadStocktakeProductList();
+            if (currentStocktakeInView) renderStocktakeInterface(currentStocktakeInView);
+        }
+
+        async function loadStocktakeProductList() {
+            try {
+                const data = await apiCall('/api/products');
+                stocktakeProductList = data.products || [];
+                const hint = document.querySelector('#editAddPanel div[style*="font-size: 0.8em"]');
+                if (hint) hint.textContent = stocktakeProductList.length + ' products loaded';
+            } catch (e) {
+                console.error('Failed to load product list', e);
+            }
+        }
+
+        function renderStocktakeProductSuggestions(q) {
+            const el = document.getElementById('stocktakeProductSuggestions');
+            if (!el) return;
+            const term = (q || '').toLowerCase().trim();
+            if (!term || !stocktakeProductList) { el.innerHTML = ''; return; }
+            const existing = new Set((currentStocktakeInView?.haloData?.items || []).map(i => i.id));
+            const matches = [];
+            for (const p of stocktakeProductList) {
+                if ((p.name && p.name.toLowerCase().includes(term)) || String(p.id) === term) {
+                    matches.push(p);
+                    if (matches.length >= 20) break;
+                }
+            }
+            if (matches.length === 0) {
+                el.innerHTML = '<div class="muted" style="padding:6px;">No matches</div>';
+                return;
+            }
+            el.innerHTML = matches.map(p => `
+                <div class="po-result" onclick="addItemToStocktakeUI(${p.id})">
+                    <strong>${escapeHtml(p.name || '')}</strong>
+                    <span class="muted"> — ID ${p.id} • stock: ${p.stock}${existing.has(p.id) ? ' • ⚠️ already in stocktake' : ''}</span>
+                </div>
+            `).join('');
+        }
+
+        async function addItemToStocktakeUI(itemId) {
+            if (!currentStocktakeInView) return;
+            const existing = (currentStocktakeInView.haloData?.items || []).find(i => i.id === itemId);
+            if (existing) {
+                alert(`Item already in stocktake:\n\n${existing.name}\n(ID ${itemId})\n\nIt may be hidden from the Scanned Items list because nothing has been counted yet. Use the Complete Inventory Summary below to find it.`);
+                return;
+            }
+            try {
+                const result = await apiCall('/api/stocktake/' + currentStocktakeInView.id + '/add-item', {
+                    method: 'POST',
+                    body: { itemId }
+                });
+                if (!result.added) {
+                    alert('Item added but server reports it was already present (race condition?).');
+                }
+                currentStocktakeInView = result.stocktake;
+                document.getElementById('stocktakeProductSearch').value = '';
+                document.getElementById('stocktakeProductSuggestions').innerHTML = '';
+                renderStocktakeInterface(result.stocktake);
+                showActivity(`➕ Added item ${itemId} to stocktake`);
+            } catch (err) {
+                alert('Failed to add item: ' + err.message);
+            }
+        }
+
+        async function removeItemFromStocktakeUI(stocktakeId, itemId) {
+            if (!confirm(`Remove item ${itemId} from this stocktake?\n\nCounted data for this item will be lost.`)) return;
+            try {
+                const result = await apiCall('/api/stocktake/' + stocktakeId + '/remove-item', {
+                    method: 'POST',
+                    body: { itemId }
+                });
+                currentStocktakeInView = result.stocktake;
+                renderStocktakeInterface(result.stocktake);
+                showActivity(`➖ Removed item ${itemId}`);
+            } catch (err) {
+                alert('Failed to remove item: ' + err.message);
+            }
+        }
+
+        async function confirmComplete() {
+            if (!currentStocktakeInView) return;
+            const data = computeVariances(currentStocktakeInView);
+            const missing = data.variances.filter(v => !v.resolvedByRefresh && !(v.reason || '').trim()).length;
+            if (missing > 0) {
+                const ok = confirm(`${missing} variance${missing === 1 ? '' : 's'} ha${missing === 1 ? 's' : 've'} no reason. Complete anyway?`);
+                if (!ok) {
+                    const firstEmpty = data.variances.find(v => !(v.reason || '').trim());
+                    if (firstEmpty) {
+                        const input = document.querySelector(`tr[data-item="${firstEmpty.itemId}"][data-loc="${firstEmpty.locationId}"] .reason-input`);
+                        if (input) { input.focus(); input.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                    }
+                    return;
+                }
+            } else if (data.variances.length === 0) {
+                if (!confirm('No variances detected. Complete stocktake?')) return;
+            } else {
+                if (!confirm(`All ${data.variances.length} variance${data.variances.length === 1 ? '' : 's'} have reasons. Generate final report?`)) return;
+            }
+            reviewMode = false;
+            editMode = false;
+            await completeStocktake(currentStocktakeInView.id);
         }
 
         // Build barcode lookup map for quick scanning
@@ -1366,7 +2443,7 @@
                         counted: getCountedQuantity(stocktake, item.id, location.id) || 0
                     };
 
-                    // Index by serial numbers
+                    // Index by serial numbers and asset tags
                     if (item.isSerialised && location.serialNumbers && location.serialNumbers.length > 0) {
                         location.serialNumbers.forEach(serial => {
                             // Use serial number as key
@@ -1379,6 +2456,17 @@
                                     counted: serial.found
                                 };
                                 serialCount++;
+                            }
+                            // Use asset tag as key (same target as serial)
+                            if (serial.assetTag && serial.assetTag.trim() !== '' &&
+                                serial.assetTag !== serial.serialNumber) {
+                                lookup[serial.assetTag] = {
+                                    item: item,
+                                    location: location,
+                                    serial: serial,
+                                    isAssetTagMatch: true,
+                                    counted: serial.found
+                                };
                             }
                         });
                     }
@@ -1500,6 +2588,7 @@
                         const haloItem = stocktake.haloData?.items?.find(i => i.id === item.id);
                         scannedItems.push({
                             item: haloItem,
+                            countedItemName: item.name,
                             location: location,
                             countedQuantity: location.countedQuantity || 0,
                             foundSerials: (location.serialNumbers?.filter(s => s.found) || []).length,
@@ -1547,6 +2636,21 @@
             scannedItems.forEach((scannedItem, index) => {
                 const item = scannedItem.item;
                 const location = scannedItem.location;
+                if (!item) {
+                    // Counted item no longer in haloData (e.g. consigned out after refresh)
+                    html += `
+                        <tr class="scanned-item-row" style="opacity: 0.6;">
+                            <td style="font-weight: 500;">${scannedItem.countedItemName || '(item removed from Halo)'}</td>
+                            <td></td>
+                            <td>${location.stockBinName || location.name}</td>
+                            <td style="text-align: center;">${scannedItem.countedQuantity || scannedItem.foundSerials || 0}</td>
+                            <td style="text-align: center; color: #a0aec0;">removed</td>
+                            <td></td>
+                            <td><span style="font-size: 0.75em; color: #718096;">removed from Halo</span></td>
+                        </tr>
+                    `;
+                    return;
+                }
                 const isSerialised = item.isSerialised;
                 const isOverstock = scannedItem.countedQuantity > (location.expectedQuantity || 0);
 
@@ -1568,14 +2672,23 @@
                         <td style="font-family: monospace; font-size: 0.85em;">${item.supplierPartCode || 'N/A'}</td>
                         <td>${location.stockBinName || location.name}</td>
                         <td style="text-align: center;">
-                            <span style="font-weight: 700; color: ${isOverstock ? '#48bb78' : '#667eea'};">
-                                ${isSerialised ?
-                                    (scannedItem.countedQuantity > scannedItem.totalSerials ?
+                            ${isSerialised ?
+                                `<span style="font-weight: 700; color: ${isOverstock ? '#48bb78' : '#667eea'};">
+                                    ${scannedItem.countedQuantity > scannedItem.totalSerials ?
                                     `${scannedItem.countedQuantity}/${scannedItem.totalSerials}` :
-                                    `${scannedItem.foundSerials}/${scannedItem.totalSerials}`) :
-                                    scannedItem.countedQuantity
-                                }
-                            </span>
+                                    `${scannedItem.foundSerials}/${scannedItem.totalSerials}`}
+                                </span>` :
+                                `<input type="number" min="0" step="1"
+                                    value="${scannedItem.countedQuantity}"
+                                    ${editMode ? '' : 'disabled'}
+                                    style="width: 60px; text-align: center; font-weight: 700;
+                                           color: ${isOverstock ? '#48bb78' : '#667eea'};
+                                           padding: 4px; border: 1px solid #cbd5e0; border-radius: 4px;
+                                           ${editMode ? '' : 'background: #edf2f7; cursor: not-allowed; opacity: 0.6;'}"
+                                    onclick="event.stopPropagation()"
+                                    onchange="editScannedQuantity('${stocktake.id}','${item.id}','${location.id}', this.value)"
+                                    onfocus="this.select()" />`
+                            }
                         </td>
                         <td style="text-align: center;">${location.expectedQuantity}</td>
                         <td style="text-align: right; font-family: monospace;">$${countedValue.toFixed(2)}</td>
@@ -1584,6 +2697,7 @@
                                 ${item.isSerialised ? 'Serial' : 'Qty'}
                             </span>
                             <span style="color: #999; margin-left: 5px;">▼</span>
+                            ${editMode ? `<button class="button danger" style="padding: 2px 8px; font-size: 0.75em; margin-left: 8px;" onclick="event.stopPropagation(); removeItemFromStocktakeUI('${stocktake.id}', ${item.id})" title="Remove this item from the stocktake">✖ Remove</button>` : ''}
                         </td>
                     </tr>
                     <tr id="details-${item.id}-${location.id}" style="display: none;">
@@ -1688,19 +2802,65 @@
                             <th>SKU/PLU</th>
                             <th>Location</th>
                             <th>Expected</th>
+                            <th>Counted</th>
+                            <th>Variance</th>
                             <th>Cost</th>
                             <th>Price</th>
                             <th>Type</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
             `;
 
+            // Build counted lookup: itemId -> locationId -> counted location
+            const countedMap = new Map();
+            (stocktake.countedData?.items || []).forEach(cItem => {
+                const locMap = new Map();
+                (cItem.stockLocations || []).forEach(l => locMap.set(l.id, l));
+                countedMap.set(cItem.id, locMap);
+            });
+
             // Sort items by name for better readability
             const sortedItems = [...stocktake.haloData.items].sort((a, b) => a.name.localeCompare(b.name));
 
             sortedItems.forEach(item => {
-                item.stockLocations?.forEach(location => {
+                // Union of locations: halo (current) + counted (may include ones removed by refresh)
+                const countedLocs = countedMap.get(item.id);
+                const haloLocIds = new Set((item.stockLocations || []).map(l => l.id));
+                const countedLocIds = countedLocs ? [...countedLocs.keys()] : [];
+                const allLocIds = [...haloLocIds];
+                for (const id of countedLocIds) {
+                    if (!haloLocIds.has(id)) allLocIds.push(id);
+                }
+                if (!allLocIds.length) return;
+
+                if (!allLocIds.length) {
+                    // Item exists in stocktake but has no stock locations (e.g. out of stock
+                    // everywhere). Still render a placeholder row so it's discoverable.
+                    html += `
+                        <tr style="opacity: 0.6;">
+                            <td style="font-weight: 500;">${item.name}</td>
+                            <td style="font-family: monospace; font-size: 0.85em;">${item.supplierPartCode || 'N/A'}</td>
+                            <td><span class="muted">— no stock location —</span></td>
+                            <td style="text-align: center;">0</td>
+                            <td style="text-align: center;">–</td>
+                            <td style="text-align: center;">–</td>
+                            <td style="text-align: right; font-family: monospace;">$${(item.cost || 0).toFixed(2)}</td>
+                            <td style="text-align: right; font-family: monospace;">$${(item.price || 0).toFixed(2)}</td>
+                            <td style="text-align: center;"><span class="serial-badge ${item.isSerialised ? 'yes' : 'no'}">${item.isSerialised ? 'Serial' : 'Qty'}</span></td>
+                            <td style="text-align: center;"><button class="button secondary" style="padding: 4px 10px; font-size: 0.8em;" onclick="refreshSingleItemFromSummary(${item.id})" title="Re-pull from Halo">🔄 Refresh</button></td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                allLocIds.forEach(locId => {
+                    const location = (item.stockLocations || []).find(l => l.id === locId)
+                        || countedLocs.get(locId);
+                    const cLoc = countedLocs?.get(locId);
+                    const resolvedByRefresh = !((item.stockLocations || []).find(l => l.id === locId)) && !!cLoc;
+
                     // For serialised items, show per-asset cost range if costs vary
                     let costDisplay = '$' + (item.cost || 0).toFixed(2);
                     if (item.isSerialised && location.serialNumbers?.length > 0) {
@@ -1711,18 +2871,61 @@
                             costDisplay = min !== max ? `$${min.toFixed(2)}–${max.toFixed(2)}` : `$${min.toFixed(2)}`;
                         }
                     }
+
+                    // Compute expected/counted/variance per type
+                    let expected = item.isSerialised
+                        ? (location.serialNumbers?.length || 0)
+                        : (location.expectedQuantity || 0);
+                    if (resolvedByRefresh) expected = 0; // halo no longer has stock here
+
+                    let counted = '';
+                    let variance = '';
+                    let varianceColor = '#4a5568';
+                    if (cLoc) {
+                        if (item.isSerialised) {
+                            const found = (cLoc.serialNumbers || []).filter(s => s.found).length;
+                            counted = found;
+                            variance = found - expected;
+                        } else {
+                            if (cLoc.countedQuantity !== null && cLoc.countedQuantity !== undefined) {
+                                counted = cLoc.countedQuantity;
+                                variance = cLoc.countedQuantity - expected;
+                            } else {
+                                counted = '–';
+                            }
+                        }
+                        if (typeof variance === 'number' && variance !== 0) {
+                            varianceColor = variance < 0 ? '#c53030' : '#2f855a';
+                        }
+                    } else {
+                        counted = '–';
+                    }
+
+                    const varianceDisplay = (typeof variance === 'number')
+                        ? (variance > 0 ? `+${variance}` : `${variance}`)
+                        : '–';
+
+                    const expectedDisplay = resolvedByRefresh && cLoc?.expectedQuantity
+                        ? `<span style="text-decoration: line-through; color: #a0aec0;">${cLoc.expectedQuantity}</span> → 0`
+                        : expected;
+
                     html += `
-                        <tr>
-                            <td style="font-weight: 500;">${item.name}</td>
+                        <tr style="${resolvedByRefresh ? 'opacity: 0.7; background: #f7fafc;' : ''}">
+                            <td style="font-weight: 500;">${item.name}${resolvedByRefresh ? '<div style="font-size: 0.7em; color: #38a169; font-weight: 400;">✓ resolved by refresh</div>' : ''}</td>
                             <td style="font-family: monospace; font-size: 0.85em;">${item.supplierPartCode || 'N/A'}</td>
                             <td>${location.stockBinName || location.name}</td>
-                            <td style="text-align: center;">${location.expectedQuantity || 0}</td>
+                            <td style="text-align: center;">${expectedDisplay}</td>
+                            <td style="text-align: center; font-weight: 600;">${counted}</td>
+                            <td style="text-align: center; color: ${varianceColor}; font-weight: 600;">${varianceDisplay}</td>
                             <td style="text-align: right; font-family: monospace;">${costDisplay}</td>
                             <td style="text-align: right; font-family: monospace;">$${(item.price || 0).toFixed(2)}</td>
                             <td style="text-align: center;">
                                 <span class="serial-badge ${item.isSerialised ? 'yes' : 'no'}">
                                     ${item.isSerialised ? 'Serial' : 'Qty'}
                                 </span>
+                            </td>
+                            <td style="text-align: center;">
+                                <button class="button secondary" style="padding: 4px 10px; font-size: 0.8em;" onclick="refreshSingleItemFromSummary(${item.id})" title="Re-pull this item from Halo">🔄 Refresh</button>
                             </td>
                         </tr>
                     `;
@@ -1893,12 +3096,13 @@
                     }
                 }
 
-                // If no UPC match, try exact serial number match
-                if (!matched && barcodeLookup[barcode] && barcodeLookup[barcode].isSerialMatch) {
+                // If no UPC match, try exact serial number or asset tag match
+                if (!matched && barcodeLookup[barcode] && (barcodeLookup[barcode].isSerialMatch || barcodeLookup[barcode].isAssetTagMatch)) {
                     const match = barcodeLookup[barcode];
                     const serial = match.serial;
+                    const matchType = match.isAssetTagMatch ? 'Asset Tag' : 'Serial';
 
-                    console.log('🔢 Serial match found:', match.item.name, 'Serial:', barcode, 'Found status:', serial.found);
+                    console.log(`🔢 ${matchType} match found:`, match.item.name, 'Scanned:', barcode, 'Found status:', serial.found);
 
                     if (!serial.found) {
                         await apiCall('/api/update-serial', {
@@ -1912,12 +3116,12 @@
                             }
                         });
 
-                        showActivity(`✅ ${match.item.name} - ${barcode} (Serial)`);
+                        showActivity(`✅ ${match.item.name} - ${barcode} (${matchType})`);
                         playSuccessSound();
                         matched = true;
                     } else {
                         showActivity(`⚠️ ${barcode} already scanned (${match.item.name})`);
-                        playSuccessSound(); // Use success sound since it's a valid serial
+                        playSuccessSound();
                         matched = true; // Don't fall through to other matching methods
                     }
                 }
@@ -1974,8 +3178,9 @@
 
             } catch (error) {
                 console.error('Barcode processing error:', error);
-                showActivity(`❌ Error: ${error.message}`);
+                showActivity(`❌ [${barcode}] Error: ${error.message}`);
                 playErrorSound();
+                input.value = '';
             }
         }
 
@@ -1984,6 +3189,14 @@
         let searchTimeout = null;
         let dropdownActiveIndex = -1;
         let scannedSortState = { column: null, dir: 'desc' }; // null column = most recent first
+
+        // Review-step state
+        let reviewMode = false;
+        let editMode = false;
+        let currentStocktakeInView = null;
+        let reasonSaveTimers = {};
+        let stocktakeProductList = null;
+        const HALO_BASE_URL = 'https://halo.elliotts.tech';
 
         function handleItemSearch(searchTerm, stocktakeId) {
             clearTimeout(searchTimeout);
@@ -2410,28 +3623,64 @@
         });
 
         // Show scanning activity
+        const recentScans = [];
+        const MAX_RECENT_SCANS = 15;
+
         function showActivity(message) {
+            const isError = message.includes('❌');
+            const isWarn = message.includes('⚠️');
+            const status = isError ? 'error' : (isWarn ? 'warn' : 'ok');
+
+            recentScans.unshift({ message, status, time: new Date() });
+            if (recentScans.length > MAX_RECENT_SCANS) recentScans.length = MAX_RECENT_SCANS;
+            renderRecentScans();
+        }
+
+        function renderRecentScans() {
             const activityDiv = document.getElementById('recentActivity');
-            if (activityDiv) {
+            if (!activityDiv) return;
+
+            if (recentScans.length === 0) {
                 activityDiv.innerHTML = `
-                    <div style="font-weight: 600; color: #333;">
-                        ${message}
-                        <div style="font-size: 0.75em; color: #999; margin-top: 5px;">
-                            ${new Date().toLocaleTimeString()}
+                    <div style="font-size: 0.9em; color: #666; text-align: center; padding: 10px;">
+                        📷 Ready to scan items...
+                    </div>
+                `;
+                return;
+            }
+
+            const statusColor = { error: '#c53030', warn: '#c05621', ok: '#2f855a' };
+
+            const rows = recentScans.map((scan, i) => {
+                const color = statusColor[scan.status];
+                const bg = i === 0 ? '#fff5f5' : 'transparent';
+                const weight = i === 0 ? '700' : '400';
+                return `
+                    <div style="padding: 6px 8px; border-bottom: 1px solid #edf2f7; background: ${bg};">
+                        <div style="font-weight: ${weight}; color: ${color}; font-family: monospace; font-size: 0.9em; word-break: break-all;">
+                            ${scan.message}
+                        </div>
+                        <div style="font-size: 0.7em; color: #999; margin-top: 2px;">
+                            ${scan.time.toLocaleTimeString()}
                         </div>
                     </div>
                 `;
-                // Auto-clear after 3 seconds
-                setTimeout(() => {
-                    if (activityDiv.innerHTML.includes(message)) {
-                        activityDiv.innerHTML = `
-                            <div style="font-size: 0.9em; color: #666; text-align: center; padding: 10px;">
-                                📷 Ready to scan items...
-                            </div>
-                        `;
-                    }
-                }, 3000);
-            }
+            }).join('');
+
+            activityDiv.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #e2e8f0;">
+                    <span style="font-weight: 600; color: #333;">Recent Scans</span>
+                    <span style="font-size: 0.8em;">
+                        <a href="#" onclick="clearRecentScans(); return false;" style="color: #667eea;">Clear</a>
+                    </span>
+                </div>
+                <div style="max-height: 200px; overflow-y: auto;">${rows}</div>
+            `;
+        }
+
+        function clearRecentScans() {
+            recentScans.length = 0;
+            renderRecentScans();
         }
 
         // Get counted quantity from stocktake
@@ -2457,6 +3706,27 @@
             } catch (error) {
                 console.error('Failed to update quantity:', error);
                 alert('Failed to update quantity');
+            }
+        }
+
+        // Inline-edit counted quantity from scanned items table
+        async function editScannedQuantity(stocktakeId, itemId, locationId, value) {
+            const qty = parseInt(value, 10);
+            if (isNaN(qty) || qty < 0) {
+                showActivity(`❌ Invalid quantity: ${value}`);
+                loadActiveStocktake();
+                return;
+            }
+            try {
+                await apiCall('/api/update-quantity', {
+                    method: 'POST',
+                    body: { stocktakeId, itemId, locationId, countedQuantity: qty }
+                });
+                showActivity(`✏️ Set ${itemId}/${locationId} = ${qty}`);
+                loadActiveStocktake();
+            } catch (error) {
+                showActivity(`❌ Update failed: ${error.message}`);
+                loadActiveStocktake();
             }
         }
 
@@ -2561,6 +3831,9 @@
                                 <button class="button" style="margin-top: 10px; width: 100%;" onclick="viewReport('${stocktake.id}')">
                                     View Report
                                 </button>
+                                <button class="button secondary" style="margin-top: 6px; width: 100%;" onclick="reopenStocktake('${stocktake.id}')">
+                                    ↩️ Reopen for Review
+                                </button>
                             </div>
                         `).join('')}
                     </div>
@@ -2576,7 +3849,87 @@
             }
         }
 
+        // Reopen a completed stocktake — returns to review/scanning
+        async function reopenStocktake(stocktakeId) {
+            if (!confirm('Reopen this stocktake for further review/scanning? Status will return to in-progress.')) return;
+            try {
+                await apiCall('/api/reopen-stocktake', {
+                    method: 'POST',
+                    body: { stocktakeId }
+                });
+                localStorage.setItem('activeStocktakeId', stocktakeId);
+                reviewMode = true;
+                document.querySelector('[data-tab="dashboard"]').click();
+                await loadActiveStocktake();
+            } catch (error) {
+                console.error('Failed to reopen stocktake:', error);
+                alert('Failed to reopen stocktake: ' + error.message);
+            }
+        }
+
         // View specific report
+        async function downloadReportPdf(stocktakeId) {
+            const btn = document.getElementById('downloadReportPdfBtn');
+            if (btn) { btn.disabled = true; btn.textContent = '📄 Generating...'; }
+            try {
+                const resp = await fetch(`/api/stocktake/${stocktakeId}/report-pdf`);
+                if (!resp.ok) {
+                    let detail = resp.statusText;
+                    try { detail = (await resp.json()).error || detail; } catch (e) {}
+                    throw new Error(detail);
+                }
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank');
+                setTimeout(() => URL.revokeObjectURL(url), 120000);
+                loadCachedReports(stocktakeId);
+            } catch (err) {
+                alert('Failed to generate PDF: ' + err.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.textContent = '📄 Generate PDF'; }
+            }
+        }
+
+        async function loadCachedReports(stocktakeId) {
+            try {
+                const data = await apiCall('/api/reports');
+                const all = data.reports || [];
+                const filtered = stocktakeId
+                    ? all.filter(r => r.stocktakeId === stocktakeId)
+                    : all;
+                const card = document.getElementById('cachedReportsCard');
+                const list = document.getElementById('cachedReportsList');
+                if (!card || !list) return;
+                if (filtered.length === 0) {
+                    card.style.display = 'none';
+                    return;
+                }
+                card.style.display = 'block';
+                list.innerHTML = filtered.map(r => `
+                    <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #edf2f7;">
+                        <span style="flex:1;">
+                            <strong>${escapeHtml(r.stocktakeName)}</strong>
+                            <span class="muted"> — ${new Date(r.createdAt).toLocaleString()} — ${(r.size/1024).toFixed(1)} KB</span>
+                        </span>
+                        <a class="button secondary" href="/api/reports/${encodeURIComponent(r.filename)}" download style="padding:4px 10px; font-size:0.85em;">⬇ Download</a>
+                        <button class="button danger" style="padding:4px 10px; font-size:0.85em;" onclick="deleteCachedReport('${escapeHtml(r.filename)}', '${stocktakeId}')">🗑 Remove</button>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error('Failed to load cached reports', err);
+            }
+        }
+
+        async function deleteCachedReport(filename, stocktakeId) {
+            if (!confirm('Delete this cached PDF?')) return;
+            try {
+                await apiCall('/api/reports/' + encodeURIComponent(filename), { method: 'DELETE' });
+                loadCachedReports(stocktakeId);
+            } catch (err) {
+                alert('Failed to delete: ' + err.message);
+            }
+        }
+
         async function viewReport(stocktakeId) {
             try {
                 const stocktake = await apiCall(`/api/stocktake/${stocktakeId}`);
@@ -2587,110 +3940,143 @@
                     return;
                 }
 
+                const fmt = n => '$' + (Number(n) || 0).toFixed(2);
+                const fmtVar = v => v > 0 ? `+${v}` : `${v || 0}`;
+                const varianceClass = v => v > 0 ? 'color:#2f855a;font-weight:600' : v < 0 ? 'color:#c53030;font-weight:600' : 'color:#4a5568';
+
+                const countedItems = report.countedItems || [];
+                const sortedItems = [...countedItems].sort((a, b) => (a.itemName || '').localeCompare(b.itemName || ''));
+
+                const totalCounted = sortedItems.reduce((s, r) => s + (r.counted || 0), 0);
+                const totalExpected = sortedItems.reduce((s, r) => s + (r.expected || 0), 0);
+                const totalVariance = sortedItems.reduce((s, r) => s + (r.variance || 0), 0);
+
+                const variances = report.variances || [];
+                const sortedVariances = [...variances].sort((a, b) => (a.itemName || '').localeCompare(b.itemName || ''));
+
+                const itemsHtml = sortedItems.map(r => `
+                    <tr>
+                        <td style="font-weight:500;">${escapeHtml(stripEmoji(r.itemName || ''))}</td>
+                        <td style="font-family:monospace;font-size:0.85em;">${escapeHtml(r.sku || '')}</td>
+                        <td>${escapeHtml(stripEmoji(r.locationName || ''))}</td>
+                        <td style="text-align:right;font-family:monospace;">${fmt(r.cost)}</td>
+                        <td style="text-align:right;font-family:monospace;">${fmt(r.price)}</td>
+                        <td style="text-align:center;">${r.expected}</td>
+                        <td style="text-align:center;font-weight:600;">${r.counted}</td>
+                        <td style="text-align:center;${varianceClass(r.variance)}">${fmtVar(r.variance)}</td>
+                        <td style="text-align:right;font-family:monospace;">${fmt(r.valueCounted)}</td>
+                        <td style="text-align:right;font-family:monospace;${varianceClass(r.valueVariance)}">${fmt(r.valueVariance)}</td>
+                        <td style="font-size:0.85em;">${escapeHtml(r.reason || '')}</td>
+                    </tr>
+                `).join('');
+
+                const variancesHtml = sortedVariances.map(v => `
+                    <tr>
+                        <td style="font-weight:500;">${escapeHtml(stripEmoji(v.itemName || ''))}</td>
+                        <td>${escapeHtml(stripEmoji(v.locationName || ''))}</td>
+                        <td style="text-align:center;">${v.expected}</td>
+                        <td style="text-align:center;font-weight:600;">${v.itemType === 'serialised' ? (v.found ?? 0) : (v.counted ?? 0)}</td>
+                        <td style="text-align:center;${varianceClass(v.variance)}">${fmtVar(v.variance)}</td>
+                        <td style="text-align:right;font-family:monospace;">${fmt(v.costImpact)}</td>
+                        <td style="font-size:0.85em;">${escapeHtml(v.reason || '')}</td>
+                    </tr>
+                `).join('');
+
                 let html = `
-                    <button class="button secondary" onclick="loadReports()" style="margin-bottom: 20px;">
-                        ← Back to Reports
-                    </button>
+                    <div class="report-actions no-print" style="display:flex; gap:10px; margin-bottom:15px;">
+                        <button class="button secondary" onclick="loadReports()">← Back to Reports</button>
+                        <button class="button" id="downloadReportPdfBtn" onclick="downloadReportPdf('${stocktakeId}')">📄 Generate PDF</button>
+                    </div>
 
-                    <div class="card">
-                        <h2>📊 Stocktake Report: ${stocktake.name}</h2>
-                        <p>Generated: ${new Date(report.generatedAt).toLocaleString()}</p>
+                    <div class="card" id="cachedReportsCard" style="display:none;">
+                        <h3 style="margin-top:0;">📎 Saved PDFs</h3>
+                        <div id="cachedReportsList"></div>
+                    </div>
 
-                        <div class="summary-stats">
-                            <div class="stat-box">
-                                <h3>${report.summary.totalItemsChecked}</h3>
-                                <p>Items Checked</p>
-                            </div>
-                            <div class="stat-box">
-                                <h3>${report.summary.itemsWithVariance}</h3>
-                                <p>With Variance</p>
-                            </div>
-                            <div class="stat-box">
-                                <h3>${report.summary.totalVariance}</h3>
-                                <p>Total Variance</p>
-                            </div>
-                            <div class="stat-box">
-                                <h3>$${(report.summary.totalCostImpact || 0).toFixed(2)}</h3>
-                                <p>Cost Impact</p>
-                            </div>
-                        </div>
-
-                        <h3 style="margin-top: 30px; margin-bottom: 15px;">📈 Location Summaries</h3>
-                        <div>
-                            ${report.locationSummaries.map(loc => `
-                                <div style="padding: 15px; margin-bottom: 10px; background: #f7fafc; border-radius: 8px;">
-                                    <h4>${loc.locationName}</h4>
-                                    <p>Item Variance: ${loc.itemVariance}</p>
-                                    <p>Missing Serials: ${loc.missingSerials}</p>
-                                    <p>Unexpected Serials: ${loc.unexpectedSerials}</p>
-                                </div>
-                            `).join('')}
+                    <div class="card report-header">
+                        <h2 style="margin:0 0 4px;">Stocktake Report — ${escapeHtml(stocktake.name)}</h2>
+                        <div style="color:#666;font-size:0.9em;">
+                            Generated ${new Date(report.generatedAt).toLocaleString()} • ${report.summary.totalItemsChecked} items checked
                         </div>
                     </div>
+
+                    <div class="card">
+                        <h3 style="margin-top:0;">Summary</h3>
+                        <table class="report-summary-table">
+                            <tbody>
+                                <tr><td>Items checked</td><td style="text-align:right;font-weight:600;">${report.summary.totalItemsChecked}</td></tr>
+                                <tr><td>Items with variance</td><td style="text-align:right;font-weight:600;">${report.summary.itemsWithVariance}</td></tr>
+                                <tr><td>Total units variance (abs)</td><td style="text-align:right;font-weight:600;">${report.summary.totalVariance}</td></tr>
+                                <tr><td>Total expected value (cost)</td><td style="text-align:right;font-family:monospace;font-weight:600;">${fmt(report.summary.totalExpectedValue)}</td></tr>
+                                <tr><td>Total counted value (cost)</td><td style="text-align:right;font-family:monospace;font-weight:600;">${fmt(report.summary.totalCountedValue)}</td></tr>
+                                <tr style="background:#fff5f5;"><td style="font-weight:600;">Total variance value (cost)</td><td style="text-align:right;font-family:monospace;font-weight:600;color:${report.summary.totalVarianceValue < 0 ? '#c53030' : '#2f855a'};">${fmt(report.summary.totalVarianceValue)}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="card">
+                        <h3 style="margin-top:0;">All Counted Items (${sortedItems.length})</h3>
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>SKU</th>
+                                    <th>Location</th>
+                                    <th style="text-align:right;">Cost</th>
+                                    <th style="text-align:right;">Price</th>
+                                    <th style="text-align:center;">Exp</th>
+                                    <th style="text-align:center;">Counted</th>
+                                    <th style="text-align:center;">Var</th>
+                                    <th style="text-align:right;">Counted $</th>
+                                    <th style="text-align:right;">Var $</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHtml}
+                                <tr style="background:#f7fafc;font-weight:700;border-top:2px solid #cbd5e0;">
+                                    <td colspan="5">TOTALS</td>
+                                    <td style="text-align:center;">${totalExpected}</td>
+                                    <td style="text-align:center;">${totalCounted}</td>
+                                    <td style="text-align:center;${varianceClass(totalVariance)}">${fmtVar(totalVariance)}</td>
+                                    <td style="text-align:right;font-family:monospace;">${fmt(report.summary.totalCountedValue)}</td>
+                                    <td style="text-align:right;font-family:monospace;${varianceClass(report.summary.totalVarianceValue)}">${fmt(report.summary.totalVarianceValue)}</td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    ${sortedVariances.length > 0 ? `
+                    <div class="card">
+                        <h3 style="margin-top:0;">Variances (${sortedVariances.length})</h3>
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Location</th>
+                                    <th style="text-align:center;">Exp</th>
+                                    <th style="text-align:center;">Found/Counted</th>
+                                    <th style="text-align:center;">Var</th>
+                                    <th style="text-align:right;">Cost Impact</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${variancesHtml}
+                                <tr style="background:#f7fafc;font-weight:700;border-top:2px solid #cbd5e0;">
+                                    <td colspan="5">TOTAL COST IMPACT</td>
+                                    <td style="text-align:right;font-family:monospace;">${fmt(report.summary.totalCostImpact)}</td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    ` : ''}
                 `;
 
-                if (report.variances.length > 0) {
-                    html += `
-                        <div class="card">
-                            <h2>⚠️ Variances Found</h2>
-                            <div class="variance-list">
-                                ${report.variances.map(variance => `
-                                    <div class="variance-item ${variance.variance > 0 ? 'positive' : variance.variance < 0 ? 'negative' : 'neutral'}">
-                                        <h4>${variance.itemName} @ ${variance.locationName}</h4>
-                                        <p>Type: ${variance.itemType === 'serialised' ? 'Serialised' : 'Non-Serialised'}</p>
-                                        ${variance.itemType === 'serialised' ? `
-                                            <p>Expected: ${variance.expected} | Found: ${variance.found}</p>
-                                        ` : `
-                                            <p>Expected: ${variance.expected} | Counted: ${variance.counted}</p>
-                                        `}
-                                        <p class="variance-value ${variance.variance > 0 ? 'positive' : variance.variance < 0 ? 'negative' : ''}">
-                                            Variance: ${variance.variance > 0 ? '+' : ''}${variance.variance}
-                                        </p>
-                                        ${(variance.costImpact || 0) > 0 ? `
-                                            <p style="font-family: monospace; font-weight: 600;">
-                                                Cost Impact: $${variance.costImpact.toFixed(2)}
-                                            </p>
-                                        ` : ''}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-
-                if (report.missingSerials.length > 0) {
-                    html += `
-                        <div class="card">
-                            <h2>❌ Missing Serial Numbers</h2>
-                            <div class="variance-list">
-                                ${report.missingSerials.map(missing => `
-                                    <div class="variance-item negative">
-                                        <h4>${missing.itemName} @ ${missing.locationName}</h4>
-                                        <p>Missing Serials: ${missing.serialNumbers.join(', ')}</p>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-
-                if (report.unexpectedSerials.length > 0) {
-                    html += `
-                        <div class="card">
-                            <h2>➕ Unexpected Serial Numbers</h2>
-                            <div class="variance-list">
-                                ${report.unexpectedSerials.map(unexpected => `
-                                    <div class="variance-item positive">
-                                        <h4>${unexpected.itemName} @ ${unexpected.locationName}</h4>
-                                        <p>Additional Serials: ${unexpected.serialNumbers.join(', ')}</p>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-
                 document.getElementById('reportsContent').innerHTML = html;
+                loadCachedReports(stocktakeId);
             } catch (error) {
                 alert('Failed to load report: ' + error.message);
             }

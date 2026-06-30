@@ -8,6 +8,8 @@ node_modules/
 
 # Data directory
 data/
+data-backup-*/
+export/
 
 # Logs
 logs/

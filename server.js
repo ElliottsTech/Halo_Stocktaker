@@ -1,7 +1,13 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const StocktakeManager = require('./lib/stocktake-manager');
 const StocktakeCreator = require('./stocktake-creator');
+const HaloAPI = require('./lib/halo-api');
+const { generateLabelsPDF } = require('./lib/label-generator');
+const { generateReportPDF } = require('./lib/report-generator');
+
+const halo = new HaloAPI();
 
 const app = express();
 const stocktakeManager = new StocktakeManager();
@@ -10,6 +16,44 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
+
+// IP Allowlist - uses X-Forwarded-For when source is trusted HAProxy (172.16.55.10)
+const dns = require('dns');
+const PROXY_IP = '172.16.55.10';
+const ALLOWLIST_HOST = 'ourips.elliotts.tech';
+const ALLOWLIST_TTL_MS = 5 * 60 * 1000;
+let allowlistCache = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+let allowlistFetchedAt = 0;
+
+async function refreshAllowlist() {
+  try {
+    const ips = await dns.promises.resolve4(ALLOWLIST_HOST);
+    const fresh = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+    for (const ip of ips) fresh.add(ip);
+    allowlistCache = fresh;
+    allowlistFetchedAt = Date.now();
+    console.log(`[allowlist] Refreshed: ${ips.length} IPs from ${ALLOWLIST_HOST}`);
+  } catch (err) {
+    console.error(`[allowlist] DNS lookup failed, retaining cache:`, err.message);
+  }
+}
+
+refreshAllowlist();
+setInterval(refreshAllowlist, ALLOWLIST_TTL_MS);
+
+app.use((req, res, next) => {
+  if (Date.now() - allowlistFetchedAt > ALLOWLIST_TTL_MS * 2) refreshAllowlist();
+  const tcpIp = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  let clientIp = tcpIp;
+  if (tcpIp === PROXY_IP) {
+    const xff = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    if (xff) clientIp = xff;
+  }
+  if (allowlistCache.has(clientIp)) return next();
+  console.warn(`[allowlist] DENY ${req.method} ${req.url} tcp=${tcpIp} client=${clientIp}`);
+  res.status(403).type('text').send('Forbidden: IP not allowlisted');
+});
+
 app.use(express.static('public'));
 
 // Initialize data directory
@@ -32,10 +76,115 @@ app.get('/api/stocktakes', async (req, res) => {
 app.get('/api/stocktake/:id', async (req, res) => {
   try {
     const stocktake = await stocktakeManager.loadStocktake(req.params.id);
+    // Lazy upgrade: backfill new report fields (countedItems + value totals) on
+    // reports generated before the enrichment was added.
+    if (stocktake.report && !stocktake.report.countedItems) {
+      stocktake.report = stocktakeManager.generateDifferentialReport(stocktake);
+      await stocktakeManager.saveStocktake(stocktake);
+    }
     res.json(stocktake);
   } catch (error) {
     console.error('Error getting stocktake:', error);
     res.status(500).json({ error: 'Failed to get stocktake' });
+  }
+});
+
+// Download stocktake report as A4 PDF (always regenerates, overwrites cache)
+app.get('/api/stocktake/:id/report-pdf', async (req, res) => {
+  try {
+    const stocktake = await stocktakeManager.loadStocktake(req.params.id);
+    if (!stocktake.report || !stocktake.report.countedItems) {
+      stocktake.report = stocktakeManager.generateDifferentialReport(stocktake);
+      await stocktakeManager.saveStocktake(stocktake);
+    }
+
+    const reportsDir = path.join(__dirname, 'data', 'reports');
+    await fs.promises.mkdir(reportsDir, { recursive: true });
+    const safeName = (stocktake.name || 'stocktake').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    const cacheKey = `${req.params.id}_${stocktake.report.generatedAt.replace(/[^0-9TZ.-]/g, '')}_${safeName}.pdf`;
+    const cachePath = path.join(reportsDir, cacheKey);
+
+    const pdf = await generateReportPDF(stocktake);
+    await fs.promises.writeFile(cachePath, pdf);
+    console.log(`📄 Generated + cached report PDF: ${cachePath}`);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="stocktake-${safeName}.pdf"`);
+    res.send(pdf);
+  } catch (error) {
+    console.error('Error generating report PDF:', error);
+    res.status(500).json({ error: 'Failed to generate PDF: ' + error.message });
+  }
+});
+
+// List cached report PDFs
+app.get('/api/reports', async (req, res) => {
+  try {
+    const reportsDir = path.join(__dirname, 'data', 'reports');
+    let files = [];
+    try {
+      files = await fs.promises.readdir(reportsDir);
+    } catch (e) { /* dir doesn't exist yet */ }
+    const out = [];
+    for (const f of files) {
+      if (!f.endsWith('.pdf')) continue;
+      const stat = await fs.promises.stat(path.join(reportsDir, f));
+      // Parse cache key: <stocktakeId>_<generatedAt>_<safeName>.pdf
+      const m = f.match(/^([^_]+)_(.+)_([^_]+)\.pdf$/);
+      out.push({
+        filename: f,
+        size: stat.size,
+        createdAt: stat.mtimeMs,
+        stocktakeId: m ? m[1] : null,
+        generatedAt: m ? m[2] : null,
+        stocktakeName: m ? m[3].replace(/-/g, ' ') : f.replace(/\.pdf$/, '')
+      });
+    }
+    out.sort((a, b) => b.createdAt - a.createdAt);
+    res.json({ reports: out });
+  } catch (error) {
+    console.error('Error listing reports:', error);
+    res.status(500).json({ error: 'Failed to list reports: ' + error.message });
+  }
+});
+
+// Serve a cached report PDF
+app.get('/api/reports/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    if (!/^[\w.\-]+\.pdf$/.test(filename)) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    const filePath = path.join(__dirname, 'data', 'reports', filename);
+    try {
+      await fs.promises.access(filePath);
+    } catch {
+      return res.status(404).json({ error: 'Report not found' });
+    }
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    fs.createReadStream(filePath).pipe(res);
+  } catch (error) {
+    console.error('Error serving report:', error);
+    res.status(500).json({ error: 'Failed to serve report: ' + error.message });
+  }
+});
+
+// Delete a cached report PDF
+app.delete('/api/reports/:filename', async (req, res) => {
+  try {
+    const filename = path.basename(req.params.filename);
+    if (!/^[\w.\-]+\.pdf$/.test(filename)) {
+      return res.status(400).json({ error: 'Invalid filename' });
+    }
+    const filePath = path.join(__dirname, 'data', 'reports', filename);
+    await fs.promises.unlink(filePath);
+    console.log(`🗑️ Deleted cached report: ${filename}`);
+    res.json({ success: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') return res.status(404).json({ error: 'Report not found' });
+    console.error('Error deleting report:', error);
+    res.status(500).json({ error: 'Failed to delete report: ' + error.message });
   }
 });
 
@@ -102,7 +251,8 @@ app.post('/api/update-quantity', async (req, res) => {
   try {
     const { stocktakeId, itemId, locationId, countedQuantity } = req.body;
 
-    await stocktakeManager.updateCountedQuantity(stocktakeId, itemId, locationId, countedQuantity);
+    const ok = await stocktakeManager.updateCountedQuantity(stocktakeId, itemId, locationId, countedQuantity);
+    if (!ok) return res.status(404).json({ error: 'Item or location not found in stocktake' });
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating quantity:', error);
@@ -136,6 +286,72 @@ app.post('/api/add-serial', async (req, res) => {
   }
 });
 
+// Save variance reason (review step)
+app.post('/api/update-variance-reason', async (req, res) => {
+  try {
+    const { stocktakeId, itemId, locationId, reason } = req.body;
+
+    await stocktakeManager.setVarianceReason(stocktakeId, itemId, locationId, reason);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error saving variance reason:', error);
+    res.status(500).json({ error: 'Failed to save variance reason' });
+  }
+});
+
+// Reopen a completed stocktake
+app.post('/api/reopen-stocktake', async (req, res) => {
+  try {
+    const { stocktakeId } = req.body;
+    const stocktake = await stocktakeManager.reopenStocktake(stocktakeId);
+    res.json(stocktake);
+  } catch (error) {
+    console.error('Error reopening stocktake:', error);
+    res.status(500).json({ error: 'Failed to reopen stocktake: ' + error.message });
+  }
+});
+
+// Add a single item to a stocktake (re-extracts from Halo)
+app.post('/api/stocktake/:id/add-item', async (req, res) => {
+  try {
+    const { itemId } = req.body;
+    if (!itemId) return res.status(400).json({ error: 'itemId required' });
+    const result = await stocktakeManager.addItemToStocktake(req.params.id, itemId);
+    res.json(result);
+  } catch (error) {
+    console.error('Error adding item:', error);
+    res.status(500).json({ error: 'Failed to add item: ' + error.message });
+  }
+});
+
+// Remove an item from a stocktake
+app.post('/api/stocktake/:id/remove-item', async (req, res) => {
+  try {
+    const { itemId } = req.body;
+    if (!itemId) return res.status(400).json({ error: 'itemId required' });
+    const result = await stocktakeManager.removeItemFromStocktake(req.params.id, itemId);
+    res.json(result);
+  } catch (error) {
+    console.error('Error removing item:', error);
+    res.status(500).json({ error: 'Failed to remove item: ' + error.message });
+  }
+});
+
+// Refresh selected items' expected data from Halo (preserves countedData)
+app.post('/api/refresh-halo', async (req, res) => {
+  try {
+    const { stocktakeId, itemIds } = req.body;
+    if (!Array.isArray(itemIds) || itemIds.length === 0) {
+      return res.status(400).json({ error: 'itemIds array is required' });
+    }
+    const result = await stocktakeManager.refreshItemsFromHalo(stocktakeId, itemIds);
+    res.json(result);
+  } catch (error) {
+    console.error('Error refreshing from Halo:', error);
+    res.status(500).json({ error: 'Failed to refresh from Halo: ' + error.message });
+  }
+});
+
 // Complete stocktake
 app.post('/api/complete-stocktake', async (req, res) => {
   try {
@@ -157,6 +373,89 @@ app.delete('/api/stocktake/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting stocktake:', error);
     res.status(500).json({ error: 'Failed to delete stocktake: ' + error.message });
+  }
+});
+
+// Search Purchase Orders by ref or supplier
+app.get('/api/po/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).json({ error: 'q query param required' });
+    const results = await halo.searchPurchaseOrders(q);
+    res.json({ results });
+  } catch (error) {
+    console.error('Error searching POs:', error);
+    res.status(500).json({ error: 'Failed to search POs: ' + error.message });
+  }
+});
+
+// Get a Purchase Order with line items + pre-expanded labels
+app.get('/api/po/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid PO id' });
+    const po = await halo.getPurchaseOrder(id);
+    res.json(po);
+  } catch (error) {
+    console.error('Error getting PO:', error);
+    const status = error.response?.status || 500;
+    res.status(status).json({ error: 'Failed to get PO: ' + error.message });
+  }
+});
+
+// List all products for the typeahead picker
+app.get('/api/products', async (req, res) => {
+  try {
+    const products = await halo.listProducts();
+    res.json({ products });
+  } catch (error) {
+    console.error('Error listing products:', error);
+    res.status(500).json({ error: 'Failed to list products: ' + error.message });
+  }
+});
+
+// Get in-stock instances of a product for label generation
+app.get('/api/products/:id/instances', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ error: 'Invalid product id' });
+    const data = await halo.getItemInstances(id);
+    res.json(data);
+  } catch (error) {
+    console.error('Error getting product instances:', error);
+    const status = error.response?.status || 500;
+    res.status(status).json({ error: 'Failed to get product instances: ' + error.message });
+  }
+});
+
+// Lookup asset by inventory_number / serial fragment
+app.get('/api/asset-lookup', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) return res.status(400).json({ error: 'q query param required' });
+    const data = await halo.assetToLabel(q);
+    if (!data) return res.status(404).json({ error: 'No asset matches ' + q });
+    res.json(data);
+  } catch (error) {
+    console.error('Error looking up asset:', error);
+    res.status(500).json({ error: 'Failed to look up asset: ' + error.message });
+  }
+});
+
+// Generate labels PDF
+app.post('/api/labels/generate', async (req, res) => {
+  try {
+    const labels = Array.isArray(req.body) ? req.body : req.body.labels;
+    if (!Array.isArray(labels) || labels.length === 0) {
+      return res.status(400).json({ error: 'labels array required' });
+    }
+    const pdf = await generateLabelsPDF(labels);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="labels.pdf"');
+    res.send(pdf);
+  } catch (error) {
+    console.error('Error generating labels:', error);
+    res.status(500).json({ error: 'Failed to generate labels: ' + error.message });
   }
 });
 
