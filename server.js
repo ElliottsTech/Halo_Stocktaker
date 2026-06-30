@@ -17,15 +17,16 @@ const PORT = process.env.PORT || 3000;
 // Middleware
 app.use(express.json());
 
-// IP Allowlist - uses X-Forwarded-For when source is trusted HAProxy (172.16.55.10)
+// IP Allowlist - uses X-Forwarded-For when source is trusted HAProxy
 const dns = require('dns');
-const PROXY_IP = '172.16.55.10';
-const ALLOWLIST_HOST = 'ourips.elliotts.tech';
+const PROXY_IP = process.env.PROXY_IP || '127.0.0.1';
+const ALLOWLIST_HOST = process.env.ALLOWLIST_HOST || '';
 const ALLOWLIST_TTL_MS = 5 * 60 * 1000;
 let allowlistCache = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 let allowlistFetchedAt = 0;
 
 async function refreshAllowlist() {
+  if (!ALLOWLIST_HOST) return;
   try {
     const ips = await dns.promises.resolve4(ALLOWLIST_HOST);
     const fresh = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
@@ -42,6 +43,7 @@ refreshAllowlist();
 setInterval(refreshAllowlist, ALLOWLIST_TTL_MS);
 
 app.use((req, res, next) => {
+  if (!ALLOWLIST_HOST) return next();
   if (Date.now() - allowlistFetchedAt > ALLOWLIST_TTL_MS * 2) refreshAllowlist();
   const tcpIp = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
   let clientIp = tcpIp;
