@@ -1,246 +1,142 @@
-# 🔧 Halo Stocktake System
+# Halo Stocktake System
 
-A comprehensive inventory management and stocktake solution for Halo PSA, designed to handle both serialised and non-serialised items across multiple locations.
+Inventory management + stocktake + label generation for Halo PSA. Handles serialised and non-serialised items across multiple locations.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- Halo API credentials
+- Node.js v16+
+- Halo API credentials with scopes: `read:items`, `read:assets`, `read:suppliers`, `read:pos`
 
 ### Installation
 
-1. **Install dependencies:**
 ```bash
 npm install
 ```
 
-2. **Configure environment:**
-The `.env` file is already configured with your Halo API credentials:
+Configure `.env`:
 ```
-HALO_CLIENT_ID=your_client_id
-HALO_CLIENT_SECRET=your_client_secret
-HALO_BASE_URL=url
+HALO_CLIENT_ID=...
+HALO_CLIENT_SECRET=...
+HALO_BASE_URL=https://halo.example.com
+HALO_TOKEN_URL=https://halo.example.com/auth/token
 PORT=3000
+
+# IP allowlist (DNS-resolved; leave empty to disable in dev)
+ALLOWLIST_HOST=ourips.elliotts.tech
+PROXY_IP=172.16.55.10
 ```
 
-3. **Start the server:**
+Run:
 ```bash
 npm start
 ```
 
-4. **Open in browser:**
-```
-http://localhost:3000
-```
+Open `http://localhost:3000`.
 
-## 📊 Features
+## Features
 
-### ✅ Complete Halo Integration
-- **Automatic authentication** with Halo API
-- **Real-time data extraction** of all items and stock locations
-- **Serial number tracking** for serialised items
-- **Multi-location support** for complex inventory setups
-
-### 📋 Stocktake Management
-- **Create stocktakes** with custom names and notes
-- **Categorised inventory** by asset groups
-- **Progress tracking** with real-time status updates
-- **Session management** for pause/resume functionality
-
-### 🔍 Smart Counting Interface
-- **Serialised items:** Checkbox verification for each serial number
-- **Non-serialised items:** Quantity input fields
-- **Location-based grouping** for efficient counting
-- **Additional serial capture** for unexpected inventory
-- **Item categorisation** by asset groups
-
-### 📈 Differential Reporting
-- **Variance analysis** between expected and actual counts
-- **Missing serial alerts** for serialised items
-- **Unexpected serial reporting** for additional inventory found
-- **Location summaries** for multi-site analysis
-- **Detailed reports** with export capabilities
-
-## 🎯 How It Works
-
-### 1. **Data Extraction**
-The system automatically extracts from Halo:
-- **All items** currently in stock
-- **Stock locations** with quantities
-- **Serial numbers** for serialised items
-- **Item categorisation** by asset groups
-
-### 2. **Stocktaking Process**
-- **Serialised items:** Check off each serial number as found
-- **Non-serialised items:** Enter counted quantity
-- **Add unexpected items:** Capture serials not in expected list
-- **Location-based:** Count by stock location for accuracy
-
-### 3. **Report Generation**
-Upon completion, the system generates:
-- **Summary statistics** (total items checked, variances found)
-- **Item-by-item variance details**
-- **Missing serial number reports**
-- **Unexpected inventory reports**
-- **Location-based summaries**
-
-## 📱 User Interface
-
-### Dashboard
-- Overview of all stocktakes
-- Status indicators (in progress, completed)
-- Quick access to resume or view reports
-
-### Create Stocktake
-- Name your stocktake
-- Add optional notes
-- Automatic data extraction from Halo
-
-### Active Stocktake
-- **Categorised items** by asset groups
-- **Location-based counting**
-- **Serial number verification** for serialised items
-- **Quantity entry** for non-serialised items
-- **Real-time updates** as you count
+### Stocktake
+- Create sessions with live Halo data extraction
+- Count by location (Stock site / Stock bin)
+- Serialised items: per-asset verification by serial/inventory_number
+- Non-serialised items: quantity entry
+- Capture additional/unexpected serials during counting
+- Refresh individual items from Halo (syncs serials + stock locations, prunes gone serials, adds new expected ones, downgrades items when all serials are `Unknown-*` placeholders)
+- Edit mode: add/remove items, lock counted column when idle
+- IP allowlist (DNS-resolved, X-Forwarded-For aware behind HAProxy)
 
 ### Reports
-- **Variance analysis** with color-coded indicators
-- **Missing serial alerts** in red
-- **Unexpected items** highlighted in green
-- **Location summaries** for multi-site analysis
+- Dense client-side report: all counted items with cost / price / expected / counted / variance / counted$ / variance$ / reason
+- Variance table with reasons + cost impact totals
+- Negative values colour-coded red
+- Server-generated A4 PDF (pdfkit), accountant-ready
+- PDFs cached to `data/reports/`, regenerable on demand, deletable from UI
 
-## 🔧 Technical Architecture
+### Label Generator (Dymo 99010, 28mm × 89mm)
+Three modes:
+1. **Purchase Order** — enter PO ref (e.g. `P50128-1`), generates one label per received unit
+2. **Product Lookup** — typeahead across all Halo items, select to pull in-stock instances
+3. **Asset / Serial** — search by asset tag or serial number, single label
 
-### Backend (Node.js)
-- **Express server** for API endpoints
-- **Halo API integration** with automatic authentication
-- **File-based storage** for stocktake sessions
-- **Differential calculation engine** for report generation
+Per label:
+- Item name (emoji stripped) + sell price (ex-GST × 1.1 for inc-GST)
+- Description, SKU (`qbosku`), Halo Product ID
+- Barcode: serialised items use `inventory_number` → `key_field` → UPC fallback; non-serialised items use UPC/EAN → SKU → item ID
+- Auto symbology: 12-digit → UPC-A, 13-digit → EAN-13, else Code128
 
-### Frontend (HTML/CSS/JavaScript)
-- **Responsive design** for mobile and desktop
-- **Real-time updates** as you count
-- **Tab-based navigation** for easy access
-- **Modern UI** with gradient backgrounds and smooth animations
+## API Endpoints
 
-### Data Flow
-1. **Authentication** → Halo API token
-2. **Data Extraction** → Items, locations, serial numbers
-3. **Stocktaking** → User counts and verifies
-4. **Report Generation** → Variance analysis and summaries
+### Stocktake
+- `GET  /api/stocktakes` — list all
+- `GET  /api/stocktake/:id` — full session (lazy report upgrade)
+- `POST /api/start-stocktake-creation` — async creation with progress polling
+- `GET  /api/stocktake-progress/:creationId`
+- `POST /api/create-stocktake` — sync creation
+- `POST /api/update-quantity`
+- `POST /api/update-serial`
+- `POST /api/add-serial`
+- `POST /api/update-variance-reason`
+- `POST /api/reopen-stocktake`
+- `POST /api/refresh-halo` — re-pull selected items, reconcile countedData
+- `POST /api/stocktake/:id/add-item` — add Halo item to active stocktake
+- `POST /api/stocktake/:id/remove-item`
+- `POST /api/complete-stocktake`
+- `DELETE /api/stocktake/:id`
 
-## 📊 Data Model
+### Reports
+- `GET  /api/stocktake/:id/report-pdf` — generate + cache A4 PDF
+- `GET  /api/reports` — list cached PDFs
+- `GET  /api/reports/:filename` — serve cached PDF
+- `DELETE /api/reports/:filename` — remove cached PDF
 
-### Stocktake Session
-```json
-{
-  "id": "unique_id",
-  "name": "Stocktake Name",
-  "status": "in_progress|completed",
-  "createdAt": "2026-06-25T10:00:00Z",
-  "haloData": {
-    "items": [
-      {
-        "id": 399,
-        "name": "Asus ExpertBook 14\" i5 16GB",
-        "isSerialised": true,
-        "stockLocations": [...]
-      }
-    ]
-  },
-  "countedData": {
-    "items": [...],
-    "completedAt": null
-  },
-  "report": {
-    "summary": {...},
-    "variances": [...],
-    "missingSerials": [...],
-    "unexpectedSerials": [...]
-  }
-}
+### Labels
+- `GET  /api/po/search?q=` — PO search
+- `GET  /api/po/:id` — PO with pre-expanded labels
+- `GET  /api/products` — list all items for typeahead
+- `GET  /api/products/:id/instances` — in-stock instances + pre-expanded labels
+- `GET  /api/asset-lookup?q=` — asset/serial lookup
+- `POST /api/labels/generate` — generate Dymo 99010 PDF
+
+## Architecture
+
+### Backend
+- `server.js` — Express server + routes + IP allowlist
+- `lib/halo-api.js` — Halo OAuth2 client (token auto-refresh), PO/item/asset extraction, label-shape mapping
+- `lib/stocktake-manager.js` — session persistence, counting, reconciliation, differential report
+- `lib/label-generator.js` — pdfkit + bwip-js, Dymo 99010 layout
+- `lib/report-generator.js` — pdfkit A4 report with dense tables
+
+### Frontend
+- `public/index.html` — single-page app, vanilla JS, tabs: Dashboard / New / Active / Reports / Labels
+
+### Storage
+- File-based JSON in `data/`
+- `data/index.json` — stocktake index
+- `data/stocktake-*.json` — sessions
+- `data/reports/` — cached PDFs
+
+## Technical Notes
+
+- Halo's `supplier_part_code` field often contains garbage; real UPC lives in `qbosku` — `pickUPC()` validates both
+- Halo assets may have no `inventory_number`; barcode helper falls back to `key_field` (real serial) → UPC → `A<id>`
+- PO line `price`/`baseprice` is purchase cost; sell price must be fetched from item details (`item.baseprice`)
+- Refresh logic syncs stockLocations to countedData so updates don't 404 after stock moves
+- `Unknown-*` placeholder serials (assets with no key_field/inventory_number) trigger downgrade to non-serialised when all serials are placeholders
+
+## Deployment
+
+Production (this repo runs under systemd):
+```ini
+[Service]
+WorkingDirectory=/root/halo_stocktake
+ExecStart=/usr/bin/node server.js
+EnvironmentFile=/root/halo_stocktake/.env
+Restart=on-failure
 ```
 
-## 🎨 Key Features
+Reverse proxy: HAProxy → Express. The allowlist middleware trusts `X-Forwarded-For` only when the TCP source is `PROXY_IP`.
 
-### ✨ Smart Serial Tracking
-- Automatically fetches serial numbers from Halo Assets
-- Links serialised items to their parent Items
-- Tracks by location (site_id, stockbin_id)
-- Identifies in-stock vs deployed status
+## License
 
-### 📦 Location Management
-- Multi-location support (Dunsborough Stock, Brown St Stock, etc.)
-- Location-specific counting
-- Consolidated reporting by location
-
-### 🔔 Status Indicators
-- **In Progress**: Yellow - Currently counting
-- **Completed**: Green - Finished with report
-- **Variance Detection**: Color-coded (red/green/yellow)
-
-### 📱 Mobile-Friendly
-- Responsive design for tablets and phones
-- Touch-friendly checkboxes and inputs
-- Optimized for warehouse/stockroom use
-
-## 🔒 Security
-
-- **API credentials** stored in environment variables
-- **Temporary tokens** with automatic expiry
-- **No sensitive data** in frontend code
-- **File-based storage** in local data directory
-
-## 🚀 Deployment
-
-### Development
-```bash
-npm start
-```
-
-### Production
-Consider:
-1. **Environment variables** for API credentials
-2. **Data directory** with proper permissions
-3. **Process manager** (PM2, systemd) for uptime
-4. **Reverse proxy** (nginx) for HTTPS
-
-## 📈 Performance
-
-- **283 items processed** in under 2 minutes
-- **Real-time updates** as you count
-- **Efficient API usage** with pagination
-- **Background processing** for large datasets
-
-## 🛠️ Troubleshooting
-
-### Authentication Issues
-- Check API credentials in `.env`
-- Verify Halo API access
-- Check network connectivity
-
-### Data Extraction
-- Large inventories may take several minutes
-- Check console for processing progress
-- Verify Halo API is accessible
-
-### Stocktake Issues
-- Refresh page if UI becomes unresponsive
-- Check browser console for errors
-- Verify data directory permissions
-
-## 📞 Support
-
-For issues or questions:
-1. Check browser console for errors
-2. Review server logs in terminal
-3. Verify Halo API credentials
-4. Check data directory permissions
-
----
-
-**Built with ❤️ for efficient inventory management**
-
-**Version:** 1.0.0  
-**Last Updated:** June 2026
+Internal — Elliotts Tech.
