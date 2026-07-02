@@ -4073,6 +4073,35 @@
                         </table>
                     </div>
                     ` : ''}
+
+                    ${(report.missingSerials || []).length > 0 ? (() => {
+                        const missing = report.missingSerials;
+                        const totalSerials = missing.reduce((s, m) => s + (m.serialNumbers || []).length, 0);
+                        return `
+                    <div class="card">
+                        <h3 style="margin-top:0;color:#c53030;">⚠ Missing Serials (${missing.length} items, ${totalSerials} serials)</h3>
+                        <table class="report-table">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Location</th>
+                                    <th>Missing Serial Numbers</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${missing.map(m => `
+                                    <tr>
+                                        <td style="font-weight:500;">${escapeHtml(stripEmoji(m.itemName || ''))}</td>
+                                        <td>${escapeHtml(stripEmoji(m.locationName || ''))}</td>
+                                        <td style="font-family:monospace;font-size:0.85em;color:#c53030;">
+                                            ${(m.serialNumbers || []).map(s => escapeHtml(s)).join(', ')}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    `;})() : ''}
                 `;
 
                 document.getElementById('reportsContent').innerHTML = html;
